@@ -1,0 +1,18 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "NeuralsecBrokerAssumeRoleWithExternalId",
+      "Effect": "Allow",
+      "Action": ["sts:AssumeRole"],
+      "Principal": {
+        "AWS": "arn:aws:iam::111111111111:role/neuralsec-broker"
+      },
+      "Condition": {
+        "StringEquals": {
+          "sts:ExternalId": "neuralsec-0123456789abcdef0123456789abcdef"
+        }
+      }
+    }
+  ]
+}

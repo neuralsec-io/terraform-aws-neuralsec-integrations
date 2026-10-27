@@ -1,0 +1,40 @@
+{
+  "Accounts": [
+    {
+      "Id": "111111111111",
+      "Arn": "arn:aws:organizations::111111111111:account/o-synthetic01/111111111111",
+      "Email": "one@example.com",
+      "Name": "synthetic-one",
+      "Status": "ACTIVE",
+      "JoinedMethod": "INVITED",
+      "JoinedTimestamp": "2026-01-02T03:04:05Z"
+    },
+    {
+      "Id": "222222222222",
+      "Arn": "arn:aws:organizations::111111111111:account/o-synthetic01/222222222222",
+      "Email": "two@example.com",
+      "Name": "synthetic-two",
+      "Status": "ACTIVE",
+      "JoinedMethod": "INVITED",
+      "JoinedTimestamp": "2026-01-02T03:04:05Z"
+    },
+    {
+      "Id": "333333333333",
+      "Arn": "arn:aws:organizations::111111111111:account/o-synthetic01/333333333333",
+      "Email": "three@example.com",
+      "Name": "synthetic-three",
+      "Status": "SUSPENDED",
+      "JoinedMethod": "INVITED",
+      "JoinedTimestamp": "2026-01-02T03:04:05Z"
+    },
+    {
+      "Id": "444444444444",
+      "Arn": "arn:aws:organizations::111111111111:account/o-synthetic01/444444444444",
+      "Email": "four@example.com",
+      "Name": "synthetic-four",
+      "Status": "PENDING_CLOSURE",
+      "JoinedMethod": "INVITED",
+      "JoinedTimestamp": "2026-01-02T03:04:05Z"
+    }
+  ]
+}
