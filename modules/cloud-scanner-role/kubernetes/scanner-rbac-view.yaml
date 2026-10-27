@@ -1,0 +1,27 @@
+# Read-only access to the RBAC objects of a cluster for the Neuralsec cloud scanner.
+# Apply once per EKS cluster listed in eks_clusters:
+#   kubectl apply -f scanner-rbac-view.yaml
+# It grants list on four rbac.authorization.k8s.io resources and nothing else
+# (the scanner only lists across all namespaces): no secrets, no configmaps, no wildcards. The group name must match
+# kubernetes_groups on the aws_eks_access_entry created by this module.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: neuralsec-scanner-rbac-view
+rules:
+  - apiGroups: ["rbac.authorization.k8s.io"]
+    resources: ["roles", "rolebindings", "clusterroles", "clusterrolebindings"]
+    verbs: ["list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: neuralsec-scanner-rbac-view
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: neuralsec-scanner-rbac-view
+subjects:
+  - apiGroup: rbac.authorization.k8s.io
+    kind: Group
+    name: neuralsec:scanner-rbac-view

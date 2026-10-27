@@ -17,6 +17,12 @@ locals {
     }]
   })
 
+  # Group the access entry places the role in. The ClusterRoleBinding in
+  # kubernetes/scanner-rbac-view.yaml binds this group to a read-only RBAC
+  # ClusterRole, because AmazonEKSViewPolicy does not cover
+  # rbac.authorization.k8s.io and AmazonEKSAdminViewPolicy can read Secrets.
+  eks_rbac_group = "neuralsec:scanner-rbac-view"
+
   eks_view_policy_arn = "arn:${data.aws_partition.current.partition}:eks::aws:cluster-access-policy/AmazonEKSViewPolicy"
 }
 
@@ -56,6 +62,8 @@ resource "aws_eks_access_entry" "this" {
   cluster_name  = each.value
   principal_arn = aws_iam_role.this.arn
   type          = "STANDARD"
+
+  kubernetes_groups = [local.eks_rbac_group]
 }
 
 resource "aws_eks_access_policy_association" "this" {

@@ -231,3 +231,55 @@ run "rejects_a_write_action" {
 
   expect_failures = [var.actions]
 }
+
+run "eks_access_entry_carries_the_rbac_group" {
+  command = plan
+
+  module {
+    source = "./modules/cloud-scanner-role"
+  }
+
+  variables {
+    eks_clusters = ["example"]
+  }
+
+  assert {
+    condition     = aws_eks_access_entry.this["example"].kubernetes_groups == toset(["neuralsec:scanner-rbac-view"])
+    error_message = "The EKS access entry must place the role in the neuralsec:scanner-rbac-view group."
+  }
+
+  assert {
+    condition     = aws_eks_access_policy_association.this["example"].policy_arn == "arn:aws:eks::aws:cluster-access-policy/AmazonEKSViewPolicy"
+    error_message = "The EKS view policy association must stay AmazonEKSViewPolicy, never the admin view policy."
+  }
+}
+
+run "rbac_manifest_is_read_only_rbac_only" {
+  command = plan
+
+  module {
+    source = "./modules/cloud-scanner-role"
+  }
+
+  variables {
+    eks_clusters = ["example"]
+  }
+
+  assert {
+    condition     = output.eks_rbac_group == "neuralsec:scanner-rbac-view" && strcontains(file(output.eks_rbac_manifest_path), "name: neuralsec:scanner-rbac-view")
+    error_message = "The manifest must bind the same group the access entry sets."
+  }
+
+  assert {
+    condition = alltrue([
+      for word in ["secrets", "configmaps", "\"*\""] :
+      !strcontains(join("\n", [for l in split("\n", file(output.eks_rbac_manifest_path)) : l if !startswith(trimspace(l), "#")]), word)
+    ])
+    error_message = "The manifest must not grant secrets, configmaps or wildcards."
+  }
+
+  assert {
+    condition     = strcontains(file(output.eks_rbac_manifest_path), "verbs: [\"list\"]") && length(regexall("verbs:", file(output.eks_rbac_manifest_path))) == 1
+    error_message = "The manifest must only grant list, in its single rule."
+  }
+}

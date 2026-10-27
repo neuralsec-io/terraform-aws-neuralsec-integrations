@@ -15,7 +15,7 @@ Each module declares its own provider requirements.
 
 | Module | What it creates |
 | :--- | :--- |
-| `modules/cloud-scanner-role` | read-only role per customer account, trusted only by the Neuralsec broker with the ExternalId of the connection |
+| `modules/cloud-scanner-role` | read-only role per customer account, trusted only by the Neuralsec broker with the ExternalId of the connection; for EKS it also ships a read-only RBAC ClusterRole manifest to apply per cluster |
 | `modules/cloud-scanner-org` | read-only role for the management or delegated administrator account, with the `organizations` read actions |
 | `modules/cloud-scanner-org/org-rollout` | `cloud-scanner-role` in every active account of an organization, for OpenTofu or plain Terraform |
 | `modules/policy` | the action list export and the chunker that splits it across managed policies |
