@@ -2,6 +2,8 @@
 
 Read-only role the Neuralsec broker assumes in a customer account, trusted only by the broker with the ExternalId of the connection.
 
+Requires Terraform >= 1.4 or OpenTofu >= 1.6, and AWS provider >= 5.34 for the EKS access entry type.
+
 ## Inputs
 
 | Name | Type | Default | Description |

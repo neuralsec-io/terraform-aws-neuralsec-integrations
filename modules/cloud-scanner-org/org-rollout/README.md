@@ -4,8 +4,8 @@ Applies the read-only scanner role to every account in an AWS Organization.
 
 Each member account gets `terraform/modules/cloud-scanner-role`: role
 `neuralsec-cloud-scanner`, trusted only by the Neuralsec broker role with the
-connection ExternalId. The role holds the read actions exported by app-api
-`cloud-scanner-ctl policy` (`terraform/modules/policy/actions.json`), split
+connection ExternalId. The role holds the read actions of the Neuralsec scanner's action list
+(`terraform/modules/policy/actions.json`), split
 across several customer managed policies so no document passes the IAM size
 limit.
 

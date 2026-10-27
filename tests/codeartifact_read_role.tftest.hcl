@@ -1,4 +1,4 @@
-# codeartifact-read-role module. It reproduces the role app-api renders for an
+# codeartifact-read-role module. It reproduces the role Neuralsec renders for an
 # aws_codeartifact registry today (registryservice codeArtifactRoleScope): the
 # role and its path parsed from the registry role ARN, inline policy
 # neuralsec-codeartifact-read, trust on every sibling ExternalId of the shared
@@ -42,22 +42,22 @@ run "role_matches_the_app_api_snippet" {
 
   assert {
     condition     = aws_iam_role.this.name == "neuralsec-registry-read"
-    error_message = "The default role name must stay neuralsec-registry-read, as app-api renders it."
+    error_message = "The default role name must stay neuralsec-registry-read, as Neuralsec renders it."
   }
 
   assert {
     condition     = aws_iam_role.this.path == "/"
-    error_message = "With no role path the IAM path is /, matching the app-api snippet."
+    error_message = "With no role path the IAM path is /, matching the Neuralsec snippet."
   }
 
   assert {
     condition     = aws_iam_role_policy.this.name == "neuralsec-codeartifact-read"
-    error_message = "The inline policy name is part of the app-api contract."
+    error_message = "The inline policy name is part of the Neuralsec contract."
   }
 
   assert {
     condition     = length(jsondecode(aws_iam_role_policy.this.policy).Statement) == 3
-    error_message = "The policy must hold exactly the three statements app-api renders."
+    error_message = "The policy must hold exactly the three statements Neuralsec renders."
   }
 
   assert {
@@ -79,7 +79,7 @@ run "role_matches_the_app_api_snippet" {
       "codeartifact:GetRepositoryEndpoint",
       "codeartifact:ReadFromRepository",
     ])
-    error_message = "The repository actions must be exactly the two read actions app-api grants."
+    error_message = "The repository actions must be exactly the two read actions Neuralsec grants."
   }
 
   assert {
@@ -125,7 +125,7 @@ run "trust_covers_every_sibling_external_id" {
 
   assert {
     condition     = length(jsondecode(aws_iam_role.this.assume_role_policy).Statement) == 1
-    error_message = "The trust policy holds one statement, as app-api renders it."
+    error_message = "The trust policy holds one statement, as Neuralsec renders it."
   }
 
   assert {

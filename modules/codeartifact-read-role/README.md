@@ -1,7 +1,7 @@
 # codeartifact-read-role
 
 Role the Neuralsec broker assumes to read an AWS CodeArtifact registry. It
-creates the role app-api describes for an `aws_codeartifact` registry, so the
+creates the role Neuralsec describes for an `aws_codeartifact` registry, so the
 setup instructions and this module render the same role name, inline policy
 `neuralsec-codeartifact-read`, trust policy and resource ARNs.
 
@@ -12,6 +12,8 @@ sibling registry, and the inline policy covers every sibling domain. Applying
 the template of the latest registry with all of them covers the whole set: when
 another registry starts using this role, update the existing stack or module
 run instead of creating a second role.
+
+Requires Terraform >= 1.4 or OpenTofu >= 1.6, and AWS provider >= 4.0.
 
 ## Inputs
 

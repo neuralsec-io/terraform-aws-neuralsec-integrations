@@ -2,7 +2,7 @@ locals {
   policy_name = "neuralsec-codeartifact-read"
   role_path   = var.role_path == "" ? "/" : var.role_path
 
-  # Sort and de-duplicate the domains like the app-api scope does, so the same
+  # Sort and de-duplicate the domains like the Neuralsec setup instructions do, so the same
   # set of registries always renders the same document.
   domain_arns = sort(distinct([
     for domain in var.domains :

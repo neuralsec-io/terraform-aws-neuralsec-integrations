@@ -1,6 +1,5 @@
 {
   "version": "d7559b86",
-  "source": "app-api internal/cloud-scanner/catalog/catalog.json@d7559b86",
   "account": [
     "apigateway:GET",
     "cloudformation:GetResource",

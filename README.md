@@ -6,10 +6,12 @@ Terraform modules for installing Neuralsec into an AWS account or an AWS Organiz
 
 | Name | Version |
 | :--- | :--- |
-| Terraform | >= 1.7.0 |
-| OpenTofu | >= 1.7.0 |
+| Terraform | >= 1.4 |
+| OpenTofu | >= 1.6 |
+| AWS provider | >= 5.34 for `cloud-scanner-role` (EKS access entries), >= 4.0 for the other modules |
 
-Each module declares its own provider requirements.
+There is no upper bound. Each module declares its own requirement and
+`terraform/compat/` holds the minimum-version check CI runs against them.
 
 ## Modules
 
@@ -41,4 +43,4 @@ terraform init -backend=false && terraform test
 tofu init -backend=false && tofu test
 ```
 
-The tests plan against a mocked AWS provider, so they need no credentials and make no API calls. Each submodule keeps its inputs and outputs unchanged across releases; the app-api manifest reads them to render customer setup instructions.
+The tests plan against a mocked AWS provider, so they need no credentials and make no API calls. Each submodule keeps its inputs and outputs unchanged across releases; the Neuralsec setup instructions read them to render customer setup.

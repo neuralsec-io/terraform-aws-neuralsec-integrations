@@ -1,5 +1,5 @@
-# The exported action list must be the real export of the app-api type catalog,
-# never the hand written placeholder that shipped before that catalog existed,
+# The exported action list must be the real export of the Neuralsec scanner's
+# actions, never the hand written placeholder that shipped before that catalog existed,
 # and it must name the catalog revision it came from. Plan only: the policy
 # module creates no resources.
 
@@ -21,7 +21,7 @@ run "export_is_the_real_catalog_export" {
 
   assert {
     condition     = can(regex("^[0-9a-f]{7,40}$", jsondecode(file("${path.cwd}/modules/policy/actions.json")).version))
-    error_message = "actions.json version must be the app-api git sha the export was generated from."
+    error_message = "actions.json version must be the Neuralsec revision the export was generated from."
   }
 }
 

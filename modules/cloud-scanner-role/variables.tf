@@ -1,5 +1,5 @@
 variable "external_id" {
-  description = "ExternalId of the Neuralsec connection. Generated once per connection by cloud-scanner-ctl."
+  description = "ExternalId of the Neuralsec connection. Generated once per connection by Neuralsec."
   type        = string
 
   validation {
