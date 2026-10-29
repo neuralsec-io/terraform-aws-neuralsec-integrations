@@ -1,0 +1,39 @@
+{
+  "layer_names": {
+    "arm64": "neuralsec-sensor-arm64",
+    "x86_64": "neuralsec-sensor-x86_64"
+  },
+  "account": "123456789012",
+  "version": 7,
+  "wrapper": "/opt/bin/sensor-wrapper",
+  "hooks": {
+    "glibc": "/opt/lib/libsensor_hook.so",
+    "musl": "/opt/lib/musl/libsensor_hook.so"
+  },
+  "regions": {
+    "ap-northeast-1": {
+      "arm64": "arn:aws:lambda:ap-northeast-1:123456789012:layer:neuralsec-sensor-arm64:7",
+      "x86_64": "arn:aws:lambda:ap-northeast-1:123456789012:layer:neuralsec-sensor-x86_64:7"
+    },
+    "eu-central-1": {
+      "arm64": "arn:aws:lambda:eu-central-1:123456789012:layer:neuralsec-sensor-arm64:7",
+      "x86_64": "arn:aws:lambda:eu-central-1:123456789012:layer:neuralsec-sensor-x86_64:7"
+    },
+    "eu-west-1": {
+      "arm64": "arn:aws:lambda:eu-west-1:123456789012:layer:neuralsec-sensor-arm64:7",
+      "x86_64": "arn:aws:lambda:eu-west-1:123456789012:layer:neuralsec-sensor-x86_64:7"
+    },
+    "us-east-1": {
+      "arm64": "arn:aws:lambda:us-east-1:123456789012:layer:neuralsec-sensor-arm64:7",
+      "x86_64": "arn:aws:lambda:us-east-1:123456789012:layer:neuralsec-sensor-x86_64:7"
+    },
+    "us-east-2": {
+      "arm64": "arn:aws:lambda:us-east-2:123456789012:layer:neuralsec-sensor-arm64:7",
+      "x86_64": "arn:aws:lambda:us-east-2:123456789012:layer:neuralsec-sensor-x86_64:7"
+    },
+    "us-west-2": {
+      "arm64": "arn:aws:lambda:us-west-2:123456789012:layer:neuralsec-sensor-arm64:7",
+      "x86_64": "arn:aws:lambda:us-west-2:123456789012:layer:neuralsec-sensor-x86_64:7"
+    }
+  }
+}

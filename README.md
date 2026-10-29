@@ -10,6 +10,10 @@ Terraform modules for installing Neuralsec into an AWS account or an AWS Organiz
 | OpenTofu | >= 1.6 |
 | AWS provider | >= 5.34 for `cloud-scanner-role` (EKS access entries), >= 4.0 for the other modules |
 
+`sensor-lambda` needs Terraform >= 1.6 or OpenTofu >= 1.6, and AWS provider
+>= 5.0, < 7.0. `sensor-eks` needs Helm provider >= 2.17, < 4.0; every other
+module works at the floors above.
+
 There is no upper bound. Each module declares its own requirement and
 `terraform/compat/` holds the minimum-version check CI runs against them.
 
@@ -21,6 +25,10 @@ There is no upper bound. Each module declares its own requirement and
 | `modules/cloud-scanner-org` | read-only role for the management or delegated administrator account, with the `organizations` read actions |
 | `modules/cloud-scanner-org/org-rollout` | `cloud-scanner-role` in every active account of an organization, for OpenTofu or plain Terraform |
 | `modules/policy` | the action list export and the chunker that splits it across managed policies |
+| `modules/sensor-lambda` | no resources: the Neuralsec sensor layer ARN and the environment merged into a customer Lambda function (wrapper or preload mode) |
+| `modules/sensor-ecs-sidecar` | no resources: an ECS task definition rewritten with the Neuralsec sensor init and sidecar containers, the shared volume and the PID mode |
+| `modules/sensor-eks` | a Helm release of the Neuralsec sensor chart, which runs the DaemonSet on every Linux node of the cluster |
+| `modules/sensor-ec2` | an SSM Command document and association that install the Neuralsec sensor on EC2 instances through SSM |
 
 Source addresses use the Registry form:
 

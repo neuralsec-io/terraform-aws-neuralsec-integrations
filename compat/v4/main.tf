@@ -1,8 +1,8 @@
 # Minimum-version check for the modules that support AWS provider 4.x.
 #
 # `cloud-scanner-role` needs `aws_eks_access_entry.type` (provider 5.34), so it
-# is left out here and the remaining two modules are validated alone at the
-# exact 4.0.0 floor. `scripts/check-min-versions.sh` writes the
+# is left out here and the remaining modules are validated alone at the exact
+# 4.0.0 floor. `scripts/check-min-versions.sh` writes the
 # `versions_override.tf` that pins the provider.
 
 terraform {
@@ -29,4 +29,24 @@ module "codeartifact_read_role" {
   domains = [
     { region = "eu-west-1", domain_owner = "222222222222", domain = "maven" },
   ]
+}
+
+module "sensor_ecs_sidecar" {
+  source = "../../modules/sensor-ecs-sidecar"
+
+  container_definitions = "[{\"name\":\"app\",\"image\":\"public.ecr.aws/docker/library/eclipse-temurin:21-jre\"}]"
+  app_containers        = ["app"]
+  sidecar_image         = "public.ecr.aws/neuralsec/sensor-ecs@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+  endpoint              = "https://sensor.example.com"
+}
+
+module "sensor_ec2" {
+  source = "../../modules/sensor-ec2"
+
+  endpoint       = "https://sensor.example.com"
+  sensor_version = "1.2.3"
+  sha256 = {
+    x86_64  = "0000000000000000000000000000000000000000000000000000000000000000"
+    aarch64 = "1111111111111111111111111111111111111111111111111111111111111111"
+  }
 }

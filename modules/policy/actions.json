@@ -1,5 +1,5 @@
 {
-  "version": "d7559b86",
+  "version": "8648adb2",
   "account": [
     "apigateway:GET",
     "cloudformation:GetResource",
@@ -34,6 +34,7 @@
     "ec2:DescribeVolumes",
     "ec2:DescribeVpcAttribute",
     "ec2:DescribeVpcEncryptionControls",
+    "ec2:DescribeVpcEndpointServices",
     "ec2:DescribeVpcEndpoints",
     "ec2:DescribeVpcPeeringConnections",
     "ec2:DescribeVpcs",
