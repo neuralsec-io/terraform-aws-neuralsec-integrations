@@ -1,6 +1,7 @@
 {
-  "version": "6540da87",
+  "version": "28964c21",
   "account": [
+    "access-analyzer:ListAnalyzers",
     "apigateway:GET",
     "cloudformation:GetResource",
     "cloudformation:ListResources",
@@ -91,6 +92,8 @@
     "elasticloadbalancing:DescribeTargetGroupAttributes",
     "elasticloadbalancing:DescribeTargetGroups",
     "elasticloadbalancing:DescribeTargetHealth",
+    "guardduty:GetDetector",
+    "guardduty:ListDetectors",
     "iam:GenerateCredentialReport",
     "iam:GetAccessKeyLastUsed",
     "iam:GetAccountAuthorizationDetails",
