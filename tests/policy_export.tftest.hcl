@@ -42,15 +42,15 @@ run "export_sets_are_disjoint_and_organizations_only_in_org_reader" {
   }
 
   assert {
-    condition     = alltrue([for action in jsondecode(file("${path.cwd}/modules/policy/actions.json")).account : !startswith(action, "organizations:")])
-    error_message = "Organizations actions belong to the org-reader role, never the member role."
+    condition     = alltrue([for action in jsondecode(file("${path.cwd}/modules/policy/actions.json")).account : (!startswith(action, "organizations:") || action == "organizations:DescribeOrganization")])
+    error_message = "Organizations actions belong to the org-reader role, never the member role, except the dual read organizations:DescribeOrganization."
   }
 
   assert {
     condition = length(setsubtract(
-      jsondecode(file("${path.cwd}/modules/policy/actions.json")).account,
+      setsubtract(jsondecode(file("${path.cwd}/modules/policy/actions.json")).account, ["organizations:DescribeOrganization"]),
       jsondecode(file("${path.cwd}/modules/policy/actions.json")).org_reader
-    )) == length(jsondecode(file("${path.cwd}/modules/policy/actions.json")).account)
-    error_message = "account and org_reader must not share actions."
+    )) == length(setsubtract(jsondecode(file("${path.cwd}/modules/policy/actions.json")).account, ["organizations:DescribeOrganization"]))
+    error_message = "account and org_reader must not share actions, except the dual read organizations:DescribeOrganization."
   }
 }

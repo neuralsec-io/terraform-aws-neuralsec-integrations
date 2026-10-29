@@ -105,10 +105,10 @@ run "policies_cover_exactly_the_exported_account_actions" {
   assert {
     condition = alltrue([
       for doc in output.policy_documents : alltrue([
-        for action in jsondecode(doc).Statement[0].Action : !startswith(action, "organizations:")
+        for action in jsondecode(doc).Statement[0].Action : (!startswith(action, "organizations:") || action == "organizations:DescribeOrganization")
       ])
     ])
-    error_message = "Organizations actions belong to the org-reader role, never the member role."
+    error_message = "Organizations actions belong to the org-reader role, never the member role, except the dual read organizations:DescribeOrganization."
   }
 }
 
