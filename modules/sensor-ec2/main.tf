@@ -82,11 +82,10 @@ locals {
     ProtectSystem=strict
     ProtectHome=yes
     PrivateTmp=yes
-    ReadOnlyPaths=-/sys/kernel/btf -/sys/fs/cgroup -/sys/kernel/tracing
+    ReadOnlyPaths=-/sys/kernel/btf -/sys/fs/cgroup -/sys/kernel/tracing -/sys/kernel/debug
     MemoryMax=128M
     CPUQuota=20%
-    Nice=19
-    CPUSchedulingPolicy=idle
+    Nice=10
     IOSchedulingClass=idle
     Restart=on-failure
     RestartSec=10

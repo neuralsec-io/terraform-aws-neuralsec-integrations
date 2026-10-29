@@ -34,19 +34,29 @@ NoNewPrivileges=yes
 ProtectSystem=strict
 ProtectHome=yes
 PrivateTmp=yes
-ReadOnlyPaths=/sys/kernel/btf /sys/fs/cgroup /sys/kernel/tracing
+ReadOnlyPaths=/sys/kernel/btf /sys/fs/cgroup /sys/kernel/tracing /sys/kernel/debug
 MemoryMax=128M
 CPUQuota=20%
-Nice=19
-CPUSchedulingPolicy=idle
+Nice=10
 IOSchedulingClass=idle
 Restart=on-failure
 RestartSec=10
 StandardOutput=null
 ```
 
-The host kernel must expose BTF at `/sys/kernel/btf` and tracefs at
-`/sys/kernel/tracing`.
+The daemon runs at `SCHED_OTHER` nice 10, never `SCHED_IDLE`: the ring reader
+must not be starved by the customer's workloads.
+
+## Requirements
+
+- Linux kernel 5.8 or later, with BTF at `/sys/kernel/btf` and tracefs at
+  `/sys/kernel/tracing`. The BPF ring buffer landed in 5.8, and the unit
+  grants no `CAP_SYS_ADMIN`.
+- IMDSv2 required: set the instance metadata options to
+  `HttpTokens = required` so IMDSv1 is disabled.
+- The instance role needs no extra permission. `AmazonSSMManagedInstanceCore`
+  is enough for Systems Manager to run the document, and the sensor makes no
+  other AWS call; the module stores no secret.
 
 With `uninstall = true` the document stops, disables and removes the unit and
 the binary instead of installing them; the association is kept, so the removal

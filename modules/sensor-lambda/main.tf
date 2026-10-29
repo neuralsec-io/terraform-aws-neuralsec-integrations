@@ -190,7 +190,7 @@ locals {
   image_preload = length(local.image_existing_preload) == 0 ? local.hook : "${local.hook}:${join(":", local.image_existing_preload)}"
   image_chain   = try(local.final_env["RUNTIME_SENSOR_CHAIN_WRAPPER"], "")
   image_lines = concat(
-    ["COPY --from=<registry>/neuralsec-sensor-lambda:<version> /opt /opt"],
+    ["COPY --from=<registry>/sensor-lambda:<version> /opt /opt"],
     ["ENV RUNTIME_SENSOR_ENDPOINT=${var.endpoint}"],
     local.mode == "wrapper"
     ? concat(

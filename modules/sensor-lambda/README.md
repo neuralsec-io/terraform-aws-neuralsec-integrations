@@ -113,7 +113,7 @@ returns the function's environment unchanged and gives the Dockerfile lines in
 `image_instructions`:
 
 ```dockerfile
-COPY --from=<registry>/neuralsec-sensor-lambda:<version> /opt /opt
+COPY --from=<registry>/sensor-lambda:<version> /opt /opt
 ENV RUNTIME_SENSOR_ENDPOINT=https://sensor.example.com
 ENV AWS_LAMBDA_EXEC_WRAPPER=/opt/bin/sensor-wrapper
 ```

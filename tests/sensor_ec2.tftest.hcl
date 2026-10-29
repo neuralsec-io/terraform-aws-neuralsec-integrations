@@ -130,11 +130,10 @@ run "unit_carries_every_hardening_line" {
         "ProtectSystem=strict",
         "ProtectHome=yes",
         "PrivateTmp=yes",
-        "ReadOnlyPaths=-/sys/kernel/btf -/sys/fs/cgroup -/sys/kernel/tracing",
+        "ReadOnlyPaths=-/sys/kernel/btf -/sys/fs/cgroup -/sys/kernel/tracing -/sys/kernel/debug",
         "MemoryMax=128M",
         "CPUQuota=20%",
-        "Nice=19",
-        "CPUSchedulingPolicy=idle",
+        "Nice=10",
         "IOSchedulingClass=idle",
         "Restart=on-failure",
         "RestartSec=10",
@@ -142,6 +141,16 @@ run "unit_carries_every_hardening_line" {
       ] : strcontains(aws_ssm_document.sensor.content, line)
     ])
     error_message = "the systemd unit must carry every hardening line"
+  }
+
+  assert {
+    condition     = !strcontains(aws_ssm_document.sensor.content, "CPUSchedulingPolicy")
+    error_message = "the unit must stay at SCHED_OTHER nice 10, never SCHED_IDLE"
+  }
+
+  assert {
+    condition     = strcontains(aws_ssm_document.sensor.content, "ReadOnlyPaths=-/sys/kernel/btf -/sys/fs/cgroup -/sys/kernel/tracing -/sys/kernel/debug")
+    error_message = "the unit must mount /sys/kernel/debug read-only for the BPF daemon"
   }
 
   assert {

@@ -516,7 +516,7 @@ run "enable_container_image" {
   }
   assert {
     condition = output.image_instructions == chomp(<<-EOT
-COPY --from=<registry>/neuralsec-sensor-lambda:<version> /opt /opt
+COPY --from=<registry>/sensor-lambda:<version> /opt /opt
 ENV RUNTIME_SENSOR_ENDPOINT=https://ingest.example.com
 ENV AWS_LAMBDA_EXEC_WRAPPER=/opt/bin/sensor-wrapper
 ENV RUNTIME_SENSOR_CHAIN_WRAPPER=/opt/otel-instrument
@@ -857,7 +857,7 @@ run "enable_egress_proxy_container_image" {
   }
   assert {
     condition = output.image_instructions == chomp(<<-EOT
-COPY --from=<registry>/neuralsec-sensor-lambda:<version> /opt /opt
+COPY --from=<registry>/sensor-lambda:<version> /opt /opt
 ENV RUNTIME_SENSOR_ENDPOINT=https://ingest.example.com
 ENV AWS_LAMBDA_EXEC_WRAPPER=/opt/bin/sensor-wrapper
 ENV RUNTIME_SENSOR_CHAIN_WRAPPER=/opt/otel-instrument
