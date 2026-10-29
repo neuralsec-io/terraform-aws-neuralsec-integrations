@@ -1,5 +1,5 @@
 {
-  "version": "8648adb2",
+  "version": "30ee1b17",
   "account": [
     "apigateway:GET",
     "cloudformation:GetResource",
@@ -39,6 +39,9 @@
     "ec2:DescribeVpcPeeringConnections",
     "ec2:DescribeVpcs",
     "ec2:DescribeVpnGateways",
+    "ec2:GetEbsEncryptionByDefault",
+    "ec2:GetImageBlockPublicAccessState",
+    "ec2:GetSnapshotBlockPublicAccessState",
     "ecr:DescribeRepositories",
     "ecr:GetLifecyclePolicy",
     "ecr:GetRepositoryPolicy",
@@ -107,6 +110,7 @@
     "rds:DescribeDBClusters",
     "rds:DescribeDBInstances",
     "s3:GetAccelerateConfiguration",
+    "s3:GetAccountPublicAccessBlock",
     "s3:GetAnalyticsConfiguration",
     "s3:GetBucketAbac",
     "s3:GetBucketCORS",
