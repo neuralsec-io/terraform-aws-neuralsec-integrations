@@ -1,5 +1,5 @@
 {
-  "version": "bd8c69e8",
+  "version": "ee9c9ea7",
   "account": [
     "access-analyzer:ListAnalyzers",
     "apigateway:GET",
@@ -69,7 +69,7 @@
     "ecs:ListClusters",
     "ecs:ListServices",
     "ecs:ListTagsForResource",
-    "ecs:ListTaskDefinitionFamilies",
+    "ecs:ListTaskDefinitions",
     "ecs:ListTasks",
     "eks:DescribeAccessEntry",
     "eks:DescribeCluster",

@@ -26,7 +26,7 @@ There is no upper bound. Each module declares its own requirement and
 | `modules/cloud-scanner-org/org-rollout` | `cloud-scanner-role` in every active account of an organization, for OpenTofu or plain Terraform |
 | `modules/policy` | the action list export and the chunker that splits it across managed policies |
 | `modules/sensor-lambda` | no resources: the Neuralsec sensor layer ARN and the environment merged into a customer Lambda function (wrapper or preload mode) |
-| `modules/sensor-ecs-sidecar` | no resources: an ECS task definition rewritten with the Neuralsec sensor init and sidecar containers, the shared volume and the PID mode |
+| `modules/sensor-ecs-sidecar` | no resources: an ECS task definition rewritten with the Neuralsec sensor init and sidecar containers, the shared volumes and the PID mode |
 | `modules/sensor-eks` | a Helm release of the Neuralsec sensor chart, which runs the DaemonSet on every Linux node of the cluster |
 | `modules/sensor-ec2` | an SSM Command document and association that install the Neuralsec sensor on EC2 instances through SSM |
 

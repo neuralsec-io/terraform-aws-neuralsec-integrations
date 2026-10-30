@@ -7,6 +7,13 @@
 #   * `neuralsec-sensor`: non-essential observer and/or opt-in tracer. Nothing
 #     depends on it.
 #
+# Hook delivery needs the ingest endpoint: the `neuralsec-sensor` container
+# drains the apps' hook rings (`--hook-ring`) only when it has
+# `RUNTIME_SENSOR_ENDPOINT` in its environment. This module sets it from the
+# required `endpoint` variable. Without the endpoint the sidecar reports one
+# `SensorHealth` line on stdout naming the missing variable and the rings stay
+# unread.
+#
 # The sidecar used to be a single container with a HEALTHY dependency. That
 # deadlocks fail-open: a failed install writes no readiness marker, the app
 # waits forever, and the task never starts.
@@ -28,6 +35,12 @@ locals {
   observer_name = "neuralsec-sensor"
   hook_root     = "/opt/neuralsec-sensor/lib"
   hook_file     = "libsensor_hook.so"
+  # Shared ring volume. The init container makes the root directory (root-owned,
+  # 1777 like /tmp) and nothing else: each hooked container gets its own
+  # subdirectory <ring_root>/<container>/ring.bin, created by the hook under the
+  # app's own uid, so containers with different uids never share a ring. The
+  # sidecar (root) only reads them.
+  ring_root = "/opt/neuralsec-sensor/ring"
 
   definitions      = jsondecode(var.container_definitions)
   observer_enabled = var.enable_observer || var.enable_ptrace
@@ -37,6 +50,18 @@ locals {
     containerPath = local.hook_root
   }
 
+  ring_mount = {
+    sourceVolume  = "neuralsec-sensor-ring"
+    containerPath = local.ring_root
+    readOnly      = false
+  }
+
+  # The sidecar drains the rings, so it runs (and the task shares one PID
+  # namespace for the lane-owner liveness check) whenever at least one container
+  # gets a hook.
+  drain_enabled  = anytrue([for path in values(local.hook_paths) : path != null])
+  sidecar_needed = local.observer_enabled || local.drain_enabled
+
   init_container = {
     name      = local.init_name
     image     = var.sidecar_image
@@ -45,9 +70,10 @@ locals {
     # the sidecar the lowest weight against the app container and it only runs
     # on CPU the app is not using.
     cpu     = 2
-    command = ["--install-lib", local.hook_root]
+    command = ["--install-lib", local.hook_root, "--prepare-ring-dir", local.ring_root]
     mountPoints = [
       merge(local.volume_mount, { readOnly = false }),
+      local.ring_mount,
     ]
   }
 
@@ -61,12 +87,14 @@ locals {
       command = concat(
         var.enable_observer ? ["--observe"] : [],
         var.enable_ptrace ? ["--ptrace"] : [],
+        local.drain_enabled ? ["--hook-ring", local.ring_root] : [],
       )
       environment = [
         { name = "RUNTIME_SENSOR_ENDPOINT", value = var.endpoint },
       ]
       mountPoints = [
         merge(local.volume_mount, { readOnly = false }),
+        local.ring_mount,
       ]
     },
     # SYS_PTRACE goes on the observer only, and only when the tracer is on.
@@ -83,7 +111,7 @@ locals {
   # observer objects have different attribute sets.
   appended = concat(
     [jsonencode(local.init_container)],
-    local.observer_enabled ? [jsonencode(local.observer_container)] : [],
+    local.sidecar_needed ? [jsonencode(local.observer_container)] : [],
   )
 
   # Per-container hook path, or null when the image is static / libc unknown.
@@ -96,7 +124,7 @@ locals {
   }
 
   # Existing LD_PRELOAD entries are preserved and the hook is appended with ":".
-  environments = {
+  preload_environments = {
     for container in local.definitions : try(container.name, "") => (
       local.hook_paths[try(container.name, "")] == null
       ? try(container.environment, [])
@@ -116,6 +144,20 @@ locals {
     )
   }
 
+  # Hooked containers also get their own ring path (one subdirectory per
+  # container). A customer value for the same variable is replaced, never
+  # duplicated, so the hook always writes where the sidecar drains.
+  environments = {
+    for container in local.definitions : try(container.name, "") => concat(
+      [for entry in local.preload_environments[try(container.name, "")] : entry if try(entry.name, "") != "RUNTIME_SENSOR_SHM_PATH"],
+      [
+        for hooked in [local.hook_paths[try(container.name, "")]] :
+        { name = "RUNTIME_SENSOR_SHM_PATH", value = "${local.ring_root}/${try(container.name, "")}/ring.bin" }
+        if hooked != null
+      ],
+    )
+  }
+
   # Encoded per container: Terraform cannot unify the original object type
   # with the merged one, so each element crosses the boundary as JSON text.
   encoded_containers = [
@@ -130,7 +172,7 @@ locals {
             )
             mountPoints = concat(
               try(container.mountPoints, []),
-              [merge(local.volume_mount, { readOnly = true })],
+              [merge(local.volume_mount, { readOnly = true }), local.ring_mount],
             )
           },
           # Only present when this container gets a hook: a static image keeps

@@ -11,7 +11,6 @@ variable "app_containers" {
 variable "sidecar_image" {
   description = "Digest-pinned Neuralsec sensor sidecar image (repository@sha256:...)."
   type        = string
-  default     = "public.ecr.aws/neuralsec/sensor-ecs"
 
   validation {
     condition     = can(regex("@sha256:[0-9a-f]{64}$", var.sidecar_image))

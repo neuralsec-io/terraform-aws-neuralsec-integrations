@@ -125,7 +125,7 @@ run "endpoint_must_be_https" {
   expect_failures = [var.endpoint]
 }
 
-run "sidecar_image_default_must_be_digest_pinned" {
+run "sidecar_image_must_be_digest_pinned" {
   command = plan
 
   module {
@@ -203,8 +203,12 @@ run "pid_mode_task_when_observer" {
   }
 
   assert {
-    condition     = length(output.volumes) == 1 && output.volumes[0].name == "neuralsec-sensor-lib"
-    error_message = "the shared hook volume must be exposed for the task definition"
+    condition = (
+      length(output.volumes) == 2
+      && output.volumes[0].name == "neuralsec-sensor-lib"
+      && output.volumes[1].name == "neuralsec-sensor-ring"
+    )
+    error_message = "the hook volume and the ring volume must be exposed for the task definition"
   }
 }
 
@@ -270,7 +274,7 @@ run "existing_ld_preload_preserved_and_appended" {
   }
 
   assert {
-    condition     = length(jsondecode(output.container_definitions)[0].environment) == 1
+    condition     = length([for entry in jsondecode(output.container_definitions)[0].environment : entry if entry.name == "LD_PRELOAD"]) == 1
     error_message = "appending must replace LD_PRELOAD, not duplicate the variable"
   }
 }
@@ -304,11 +308,13 @@ run "static_image_gets_no_ld_preload" {
 
   assert {
     condition = (
-      length(jsondecode(output.container_definitions)[0].mountPoints) == 1
+      length(jsondecode(output.container_definitions)[0].mountPoints) == 2
       && jsondecode(output.container_definitions)[0].mountPoints[0].readOnly == true
+      && jsondecode(output.container_definitions)[0].mountPoints[1].sourceVolume == "neuralsec-sensor-ring"
+      && jsondecode(output.container_definitions)[0].mountPoints[1].readOnly == false
       && jsondecode(output.container_definitions)[0].dependsOn[0].condition == "COMPLETE"
     )
-    error_message = "a static image still gets the mount and the fail-open dependency"
+    error_message = "a static image still gets both mounts and the fail-open dependency"
   }
 }
 
@@ -345,5 +351,83 @@ run "other_fields_untouched" {
   assert {
     condition     = jsondecode(output.container_definitions)[0].cpu == 512
     error_message = "the app container keeps its own CPU units; the sidecar weight is never copied to it"
+  }
+}
+
+run "ring_volume_per_container_env_and_pid_mode" {
+  command = plan
+
+  module {
+    source = "./modules/sensor-ecs-sidecar"
+  }
+
+  variables {
+    enable_observer       = false
+    enable_ptrace         = false
+    libc                  = { app = "glibc", other = "musl", static = "none" }
+    app_containers        = ["app", "other", "static"]
+    container_definitions = <<-JSON
+    [
+      {"name": "app", "image": "a", "environment": [{"name": "RUNTIME_SENSOR_SHM_PATH", "value": "/tmp/own.bin"}]},
+      {"name": "other", "image": "b"},
+      {"name": "static", "image": "c"}
+    ]
+    JSON
+  }
+
+  # Every instrumented app container mounts the ring volume read-write at the shared root.
+  assert {
+    condition = alltrue([
+      for c in jsondecode(output.container_definitions) : (
+        length([for m in c.mountPoints : m if m.sourceVolume == "neuralsec-sensor-ring" && m.containerPath == "/opt/neuralsec-sensor/ring" && m.readOnly == false]) == 1
+      ) if contains(["app", "other", "static"], c.name)
+    ])
+    error_message = "app containers must mount neuralsec-sensor-ring read-write at /opt/neuralsec-sensor/ring"
+  }
+
+  # Each hooked container gets its own path; a customer value is replaced, never duplicated.
+  assert {
+    condition = (
+      [for e in jsondecode(output.container_definitions)[0].environment : e.value if e.name == "RUNTIME_SENSOR_SHM_PATH"] == ["/opt/neuralsec-sensor/ring/app/ring.bin"]
+      && [for e in jsondecode(output.container_definitions)[1].environment : e.value if e.name == "RUNTIME_SENSOR_SHM_PATH"] == ["/opt/neuralsec-sensor/ring/other/ring.bin"]
+    )
+    error_message = "hooked containers need a per-container RUNTIME_SENSOR_SHM_PATH"
+  }
+
+  assert {
+    condition     = !contains([for e in try(jsondecode(output.container_definitions)[2].environment, []) : e.name], "RUNTIME_SENSOR_SHM_PATH")
+    error_message = "a static image gets no ring path"
+  }
+
+  # The init container prepares the ring root; every app waits for it with COMPLETE.
+  assert {
+    condition = (
+      contains([for c in jsondecode(output.container_definitions) : c if c.name == "neuralsec-sensor-init"][0].command, "--prepare-ring-dir")
+      && [for c in jsondecode(output.container_definitions) : c if c.name == "neuralsec-sensor-init"][0].command[length([for c in jsondecode(output.container_definitions) : c if c.name == "neuralsec-sensor-init"][0].command) - 1] == "/opt/neuralsec-sensor/ring"
+      && alltrue([for c in jsondecode(output.container_definitions) : (
+        [for d in c.dependsOn : d.condition if d.containerName == "neuralsec-sensor-init"] == ["COMPLETE"]
+      ) if contains(["app", "other", "static"], c.name)])
+    )
+    error_message = "the init container prepares the ring root and every app depends on it with COMPLETE"
+  }
+
+  # Hooks mean a drain role even with the observer off, and that needs the shared PID namespace.
+  assert {
+    condition = (
+      contains([for c in jsondecode(output.container_definitions) : c if c.name == "neuralsec-sensor"][0].command, "--hook-ring")
+      && !contains([for c in jsondecode(output.container_definitions) : c if c.name == "neuralsec-sensor"][0].command, "--observe")
+      && output.pid_mode == "task"
+    )
+    error_message = "the drain role needs the sidecar container and pidMode task"
+  }
+
+  assert {
+    condition     = length([for m in [for c in jsondecode(output.container_definitions) : c if c.name == "neuralsec-sensor"][0].mountPoints : m if m.sourceVolume == "neuralsec-sensor-ring" && m.readOnly == false]) == 1
+    error_message = "the sidecar mounts the ring volume read-write"
+  }
+
+  assert {
+    condition     = length([for m in [for c in jsondecode(output.container_definitions) : c if c.name == "neuralsec-sensor-init"][0].mountPoints : m if m.sourceVolume == "neuralsec-sensor-ring" && m.readOnly == false]) == 1
+    error_message = "the init container mounts the ring volume read-write"
   }
 }

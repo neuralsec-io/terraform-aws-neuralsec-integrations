@@ -6,15 +6,18 @@ output "container_definitions" {
 }
 
 output "pid_mode" {
-  description = "Task pidMode: task when the observer or tracer needs a shared PID namespace, else null."
-  value       = (var.enable_observer || var.enable_ptrace) ? "task" : null
+  description = "Task pidMode: task when the observer, tracer or hook ring drain needs a shared PID namespace, else null."
+  value       = local.sidecar_needed ? "task" : null
 }
 
 output "volumes" {
-  description = "Task volumes to merge into the task definition; the sidecar and app containers share neuralsec-sensor-lib."
+  description = "Task volumes to merge into the task definition: neuralsec-sensor-lib (hook builds) and neuralsec-sensor-ring (per-container hook rings), shared by the sidecar and the app containers."
   value = [
     {
       name = "neuralsec-sensor-lib"
+    },
+    {
+      name = "neuralsec-sensor-ring"
     },
   ]
 }
