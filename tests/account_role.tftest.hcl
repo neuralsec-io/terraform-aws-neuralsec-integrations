@@ -283,3 +283,27 @@ run "rbac_manifest_is_read_only_rbac_only" {
     error_message = "The manifest must only grant list, in its single rule."
   }
 }
+
+# A description change forces IAM managed policy replacement, which fails under
+# the fixed policy name in CloudFormation and drops the role's permissions for
+# the apply in Terraform. The first policy keeps the description every earlier
+# release created, whatever the chunk count; later policies never name the total.
+run "first_policy_description_is_stable_across_chunk_counts" {
+  command = plan
+
+  module {
+    source = "./modules/cloud-scanner-role"
+  }
+
+  assert {
+    condition     = aws_iam_policy.read[0].description == "Neuralsec cloud scanner read actions, part 1 of 1."
+    error_message = "The first read policy must keep its released description, or upgrades replace it."
+  }
+
+  assert {
+    condition = alltrue([
+      for i, p in aws_iam_policy.read : i == 0 || p.description == "Neuralsec cloud scanner read actions, part ${i + 1}."
+    ])
+    error_message = "Later read policies must not name the chunk total."
+  }
+}

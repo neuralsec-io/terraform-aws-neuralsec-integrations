@@ -44,8 +44,11 @@ resource "aws_iam_role" "this" {
 resource "aws_iam_policy" "read" {
   count = module.policy.chunk_count
 
-  name        = "${local.role_name}-read-${format("%02d", count.index + 1)}"
-  description = "Neuralsec cloud scanner read actions, part ${count.index + 1} of ${module.policy.chunk_count}."
+  name = "${local.role_name}-read-${format("%02d", count.index + 1)}"
+  # A description change forces replacement. The first policy keeps the text
+  # every earlier release created; later ones never name the chunk total, so
+  # a growing action list only adds policies.
+  description = count.index == 0 ? "Neuralsec cloud scanner read actions, part 1 of 1." : "Neuralsec cloud scanner read actions, part ${count.index + 1}."
   policy      = module.policy.documents[count.index]
 }
 

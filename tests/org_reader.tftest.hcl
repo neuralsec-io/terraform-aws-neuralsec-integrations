@@ -108,3 +108,17 @@ run "rejects_a_malformed_external_id" {
 
   expect_failures = [var.external_id]
 }
+
+# See account_role.tftest.hcl: the first policy keeps its released description.
+run "first_policy_description_is_stable_across_chunk_counts" {
+  command = plan
+
+  module {
+    source = "./modules/cloud-scanner-org"
+  }
+
+  assert {
+    condition     = aws_iam_policy.read[0].description == "Neuralsec organizations read actions, part 1 of 1."
+    error_message = "The first org reader policy must keep its released description, or upgrades replace it."
+  }
+}
