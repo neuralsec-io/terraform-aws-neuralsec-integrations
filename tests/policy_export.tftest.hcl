@@ -1,9 +1,8 @@
-# The exported action list must be the real export of the Neuralsec scanner's
-# actions, never the hand written placeholder that shipped before that catalog existed,
-# and it must name the catalog revision it came from. Plan only: the policy
-# module creates no resources.
+# The action list must be a released list of the Neuralsec scanner's read
+# actions, never a placeholder, and it must name the version it came from.
+# Plan only: the policy module creates no resources.
 
-run "export_is_the_real_catalog_export" {
+run "export_is_a_released_action_list" {
   command = plan
 
   module {
@@ -16,7 +15,7 @@ run "export_is_the_real_catalog_export" {
 
   assert {
     condition     = !can(jsondecode(file("${path.cwd}/modules/policy/actions.json")).placeholder)
-    error_message = "actions.json still carries the placeholder marker; replace it with the real catalog export."
+    error_message = "actions.json still carries the placeholder marker; replace it with a released action list."
   }
 
   assert {

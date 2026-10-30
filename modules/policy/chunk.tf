@@ -18,7 +18,7 @@ variable "actions" {
     error_message = "Every action must look like service:VerbName."
   }
 
-  # Named exceptions (spec §3 Permissions), each AWS access level Read and
+  # Named exceptions, each AWS access level Read and
   # changing no resource: iam:GenerateCredentialReport starts the credential
   # report; apigateway:GET is API Gateway's read action.
   validation {
@@ -41,7 +41,7 @@ variable "actions" {
         "sqs:receivemessage", "ecr:batchgetimage", "ecr:getdownloadurlforlayer",
       ], lower(action))
     ])
-    error_message = "Actions that read customer content (object bodies, secret values, parameters, logs, items, messages, image layers) are never allowed (spec §4)."
+    error_message = "Actions that read customer content (object bodies, secret values, parameters, logs, items, messages, image layers) are never allowed."
   }
 }
 
