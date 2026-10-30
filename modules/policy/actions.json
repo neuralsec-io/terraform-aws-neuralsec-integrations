@@ -1,5 +1,5 @@
 {
-  "version": "ee9c9ea7",
+  "version": "f63bff35",
   "account": [
     "access-analyzer:ListAnalyzers",
     "apigateway:GET",
@@ -57,6 +57,7 @@
     "ec2:DescribeVpnGateways",
     "ec2:GetEbsEncryptionByDefault",
     "ec2:GetImageBlockPublicAccessState",
+    "ec2:GetInstanceMetadataDefaults",
     "ec2:GetSnapshotBlockPublicAccessState",
     "ecr:DescribeRepositories",
     "ecr:GetLifecyclePolicy",
@@ -141,6 +142,7 @@
     "s3:GetAccountPublicAccessBlock",
     "s3:GetAnalyticsConfiguration",
     "s3:GetBucketAbac",
+    "s3:GetBucketAcl",
     "s3:GetBucketCORS",
     "s3:GetBucketLogging",
     "s3:GetBucketMetadataTableConfiguration",
