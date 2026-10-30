@@ -1,5 +1,5 @@
 {
-  "version": "389a3df7",
+  "version": "bd8c69e8",
   "account": [
     "access-analyzer:ListAnalyzers",
     "apigateway:GET",
@@ -125,6 +125,11 @@
     "lambda:GetPolicy",
     "lambda:ListFunctionUrlConfigs",
     "lambda:ListFunctions",
+    "logs:DescribeIndexPolicies",
+    "logs:DescribeLogGroups",
+    "logs:DescribeResourcePolicies",
+    "logs:GetDataProtectionPolicy",
+    "logs:ListTagsForResource",
     "organizations:DescribeOrganization",
     "rds:DescribeDBClusterSnapshotAttributes",
     "rds:DescribeDBClusterSnapshots",
