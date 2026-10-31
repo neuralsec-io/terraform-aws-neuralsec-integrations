@@ -1,5 +1,5 @@
 {
-  "version": "f63bff35",
+  "version": "c49126fa",
   "account": [
     "access-analyzer:ListAnalyzers",
     "apigateway:GET",
@@ -17,6 +17,7 @@
     "cloudtrail:GetTrailStatus",
     "cloudtrail:ListTags",
     "cloudtrail:ListTrails",
+    "config:DescribeConfigurationRecorderStatus",
     "dynamodb:DescribeContinuousBackups",
     "dynamodb:DescribeContributorInsights",
     "dynamodb:DescribeKinesisStreamingDestination",
@@ -27,6 +28,7 @@
     "dynamodb:ListTagsOfResource",
     "ec2:DescribeAccountAttributes",
     "ec2:DescribeAvailabilityZones",
+    "ec2:DescribeFlowLogs",
     "ec2:DescribeImageAttribute",
     "ec2:DescribeImages",
     "ec2:DescribeInstanceAttribute",
@@ -116,6 +118,7 @@
     "iam:ListPolicies",
     "iam:ListRoles",
     "iam:ListSAMLProviders",
+    "inspector2:BatchGetAccountStatus",
     "kms:DescribeKey",
     "kms:GetKeyPolicy",
     "kms:GetKeyRotationStatus",
@@ -166,6 +169,7 @@
     "secretsmanager:DescribeSecret",
     "secretsmanager:GetResourcePolicy",
     "secretsmanager:ListSecrets",
+    "securityhub:DescribeHub",
     "sns:GetDataProtectionPolicy",
     "sns:GetTopicAttributes",
     "sns:ListSubscriptionsByTopic",
