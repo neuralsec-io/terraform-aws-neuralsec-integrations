@@ -39,6 +39,10 @@ resource "aws_iam_role" "this" {
   description          = "Neuralsec read-only cloud inventory role. Assumed through the Neuralsec broker with the connection ExternalId."
   assume_role_policy   = local.trust_policy
   max_session_duration = 3600
+  # Null until the customer registers a state location, so a role installed by
+  # an earlier release plans no change. These tags are the discovery channel for
+  # the IaC state exception, see state_locations.tf.
+  tags = local.state_locations_enabled ? local.state_location_tags : null
 }
 
 resource "aws_iam_policy" "read" {
@@ -94,8 +98,8 @@ resource "terraform_data" "policy_guard" {
 
   lifecycle {
     precondition {
-      condition     = module.policy.chunk_count <= 10
-      error_message = "The exported action list needs ${module.policy.chunk_count} managed policies, but IAM allows at most 10 per role."
+      condition     = module.policy.chunk_count + (local.state_locations_enabled ? 1 : 0) <= 10
+      error_message = "The exported action list needs ${module.policy.chunk_count} managed policies${local.state_locations_enabled ? " plus the IaC state policy" : ""}, but IAM allows at most 10 per role."
     }
 
     precondition {

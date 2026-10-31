@@ -33,6 +33,7 @@ module "member_role" {
 
   external_id          = var.external_id
   neuralsec_broker_arn = var.neuralsec_broker_arn
+  state_locations      = var.state_locations
 }
 
 output "member_role_arns" {

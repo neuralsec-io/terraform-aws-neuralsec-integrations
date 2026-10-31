@@ -8,6 +8,21 @@ mock_provider "aws" {
     }
   }
 
+  mock_data "aws_region" {
+    defaults = {
+      name   = "eu-west-1"
+      region = "eu-west-1"
+    }
+  }
+
+  mock_data "aws_caller_identity" {
+    defaults = {
+      account_id = "111111111111"
+      arn        = "arn:aws:iam::111111111111:user/example"
+      user_id    = "AIDAEXAMPLEEXAMPLE01"
+    }
+  }
+
   mock_resource "aws_iam_role" {
     defaults = {
       arn = "arn:aws:iam::111111111111:role/neuralsec-cloud-scanner"
@@ -305,5 +320,341 @@ run "first_policy_description_is_stable_across_chunk_counts" {
       for i, p in aws_iam_policy.read : i == 0 || p.description == "Neuralsec cloud scanner read actions, part ${i + 1}."
     ])
     error_message = "Later read policies must not name the chunk total."
+  }
+}
+
+# The IaC state exception. Without an input no state grant exists at all: the
+# role keeps a read-only account policy and nothing that could read an object.
+# It is also a zero diff for a role installed by an earlier release: no policy,
+# no attachment, no guard and no tag appears, and the policy guard keeps the
+# input shape it always had.
+run "no_state_location_grants_nothing" {
+  command = plan
+
+  module {
+    source = "./modules/cloud-scanner-role"
+  }
+
+  assert {
+    condition = (
+      output.iac_state_policy_document == "" &&
+      length(aws_iam_policy.iac_state) == 0 &&
+      length(aws_iam_role_policy_attachment.iac_state) == 0
+    )
+    error_message = "A role without state_locations must not carry a state policy."
+  }
+
+  assert {
+    condition     = length(output.state_location_tags) == 0 && try(length(aws_iam_role.this.tags), 0) == 0
+    error_message = "A role without state_locations must not carry a state location tag."
+  }
+
+  assert {
+    condition     = length(terraform_data.state_location_guard) == 0
+    error_message = "A role without state_locations must not create the guard, or an upgrade plans a new resource."
+  }
+
+  assert {
+    condition = (
+      length(keys(terraform_data.policy_guard.input)) == 2 &&
+      terraform_data.policy_guard.input["chunks"] == output.policy_chunk_count &&
+      terraform_data.policy_guard.input["max_document_bytes"] == output.policy_max_document_bytes
+    )
+    error_message = "The policy guard input shape is part of the released state: a new key plans a change on every existing role."
+  }
+
+  assert {
+    condition = alltrue([
+      for doc in output.policy_documents : alltrue([
+        for action in jsondecode(doc).Statement[0].Action : !contains(["s3:GetObject", "kms:Decrypt"], action)
+      ])
+    ])
+    error_message = "The account read policy must never carry s3:GetObject or kms:Decrypt."
+  }
+}
+
+# The registered locations are the grant and the discovery signal: one
+# statement per read, scoped to the exact bucket, prefix and key, plus one
+# numbered tag per location for Neuralsec to read.
+run "state_locations_grant_exactly_the_registered_prefixes" {
+  command = plan
+
+  module {
+    source = "./modules/cloud-scanner-role"
+  }
+
+  variables {
+    state_locations = [
+      {
+        bucket      = "example-tf-state"
+        prefix      = "prod/"
+        kms_key_arn = "arn:aws:kms:eu-west-1:111111111111:key/1234abcd-12ab-34cd-56ef-1234567890ab"
+      },
+      {
+        bucket = "example-pulumi-state"
+        prefix = ".pulumi/stacks/"
+        tool   = "pulumi"
+        region = "us-east-1"
+      },
+    ]
+  }
+
+  assert {
+    condition = sort(distinct(flatten([
+      for s in jsondecode(output.iac_state_policy_document).Statement : s.Action
+    ]))) == sort(jsondecode(file("${path.cwd}/modules/policy/actions.json")).iac_state)
+    error_message = "The state policy must carry exactly the exported iac_state actions: the role tags are read with an action the account policy already grants."
+  }
+
+  assert {
+    condition = sort(flatten([
+      for s in jsondecode(output.iac_state_policy_document).Statement : s.Resource if s.Sid == "IacStateGetRegisteredObjects"
+      ])) == sort([
+      "arn:aws:s3:::example-pulumi-state/.pulumi/stacks/*",
+      "arn:aws:s3:::example-tf-state/prod/*",
+    ])
+    error_message = "s3:GetObject must be scoped to the registered bucket and prefix, never the bucket root."
+  }
+
+  assert {
+    condition = sort(flatten([
+      for s in jsondecode(output.iac_state_policy_document).Statement : s.Resource if startswith(s.Sid, "IacStateListRegisteredPrefixes")
+    ])) == sort(["arn:aws:s3:::example-pulumi-state", "arn:aws:s3:::example-tf-state"])
+    error_message = "s3:ListBucket must be scoped to the registered buckets."
+  }
+
+  assert {
+    condition     = length([for s in jsondecode(output.iac_state_policy_document).Statement : s if startswith(s.Sid, "IacStateListRegisteredPrefixes")]) == 2
+    error_message = "Each bucket gets one s3:ListBucket statement, so a prefix of one bucket can never condition another bucket."
+  }
+
+  assert {
+    condition = sort(distinct(flatten([
+      for s in jsondecode(output.iac_state_policy_document).Statement : s.Condition.StringLike["s3:prefix"] if s.Sid == "IacStateListRegisteredPrefixes1"
+    ]))) == sort(["prod/", "prod/*"])
+    error_message = "The first bucket's listing must be conditioned on its own prefixes and their children."
+  }
+
+  assert {
+    condition = sort(distinct(flatten([
+      for s in jsondecode(output.iac_state_policy_document).Statement : s.Condition.StringLike["s3:prefix"] if s.Sid == "IacStateListRegisteredPrefixes2"
+    ]))) == sort([".pulumi/stacks/", ".pulumi/stacks/*"])
+    error_message = "The second bucket's listing must be conditioned on its own prefixes and their children."
+  }
+
+  assert {
+    condition = flatten([
+      for s in jsondecode(output.iac_state_policy_document).Statement : concat(s.Resource, flatten(s.Condition.StringEquals["kms:ViaService"])) if s.Sid == "IacStateDecryptRegisteredKeys"
+      ]) == [
+      "arn:aws:kms:eu-west-1:111111111111:key/1234abcd-12ab-34cd-56ef-1234567890ab",
+      "s3.eu-west-1.amazonaws.com",
+    ]
+    error_message = "kms:Decrypt must be scoped to the registered key and the S3 service of its region."
+  }
+
+  assert {
+    condition     = length(aws_iam_policy.iac_state) == 1 && length(aws_iam_role_policy_attachment.iac_state) == 1
+    error_message = "state_locations must attach exactly one extra managed policy."
+  }
+
+  assert {
+    condition = output.state_location_tags == {
+      "neuralsec:state-locations-1" = "dGVycmFmb3JtCmV1LXdlc3QtMQpleGFtcGxlLXRmLXN0YXRlCnByb2Qv"
+      "neuralsec:state-locations-2" = "cHVsdW1pCnVzLWVhc3QtMQpleGFtcGxlLXB1bHVtaS1zdGF0ZQoucHVsdW1pL3N0YWNrcy8="
+    }
+    error_message = "The numbered tag is how Neuralsec learns the authoritative locations, so its encoding is a contract."
+  }
+
+  assert {
+    condition = alltrue([
+      for value in values(output.state_location_tags) :
+      length(value) <= 256 && can(regex("^[\\p{L}\\p{Z}\\p{N}_.:/=+\\-@]*$", value))
+    ])
+    error_message = "Every tag value must fit the 256 character IAM limit and IAM's tag character set, or TagRole fails on apply."
+  }
+
+  assert {
+    condition = alltrue([
+      for s in jsondecode(output.iac_state_policy_document).Statement :
+      startswith(s.Sid, "IacStateGetRegisteredObjects") || alltrue([for r in s.Resource : !strcontains(r, "*")])
+    ])
+    error_message = "Only the object ARNs may carry a wildcard, and only the one that covers the registered prefix."
+  }
+
+  assert {
+    condition     = length(aws_iam_role.this.tags) == 2 && aws_iam_role.this.tags["neuralsec:state-locations-1"] == output.state_location_tags["neuralsec:state-locations-1"]
+    error_message = "The role must carry the state location tags the module exposes."
+  }
+}
+
+run "state_locations_without_a_key_grant_no_kms" {
+  command = plan
+
+  module {
+    source = "./modules/cloud-scanner-role"
+  }
+
+  variables {
+    state_locations = [{ bucket = "example-state", prefix = "env:/" }]
+  }
+
+  assert {
+    condition = alltrue([
+      for s in jsondecode(output.iac_state_policy_document).Statement : !contains(s.Action, "kms:Decrypt")
+    ])
+    error_message = "Without a registered key the policy must not grant kms:Decrypt."
+  }
+}
+
+run "rejects_a_malformed_state_bucket" {
+  command = plan
+
+  module {
+    source = "./modules/cloud-scanner-role"
+  }
+
+  variables {
+    state_locations = [{ bucket = "Example_Bucket", prefix = "prod/" }]
+  }
+
+  expect_failures = [var.state_locations]
+}
+
+run "rejects_a_state_prefix_with_a_leading_slash" {
+  command = plan
+
+  module {
+    source = "./modules/cloud-scanner-role"
+  }
+
+  variables {
+    state_locations = [{ bucket = "example-state", prefix = "/prod/" }]
+  }
+
+  expect_failures = [var.state_locations]
+}
+
+run "rejects_a_duplicate_state_location" {
+  command = plan
+
+  module {
+    source = "./modules/cloud-scanner-role"
+  }
+
+  variables {
+    state_locations = [
+      { bucket = "example-state", prefix = "prod/" },
+      { bucket = "example-state", prefix = "prod/", tool = "pulumi" },
+    ]
+  }
+
+  expect_failures = [var.state_locations]
+}
+
+run "rejects_an_unknown_state_tool" {
+  command = plan
+
+  module {
+    source = "./modules/cloud-scanner-role"
+  }
+
+  variables {
+    state_locations = [{ bucket = "example-state", prefix = "prod/", tool = "cloudformation" }]
+  }
+
+  expect_failures = [var.state_locations]
+}
+
+# The prefix is a literal S3 key prefix: the module refuses the characters that
+# would make the listing, the s3:prefix condition and the tag disagree.
+run "rejects_a_state_prefix_with_a_wildcard" {
+  command = plan
+
+  module {
+    source = "./modules/cloud-scanner-role"
+  }
+
+  variables {
+    state_locations = [{ bucket = "example-state", prefix = "prod/*/" }]
+  }
+
+  expect_failures = [var.state_locations]
+}
+
+run "rejects_a_state_prefix_with_a_question_mark" {
+  command = plan
+
+  module {
+    source = "./modules/cloud-scanner-role"
+  }
+
+  variables {
+    state_locations = [{ bucket = "example-state", prefix = "prod/?/" }]
+  }
+
+  expect_failures = [var.state_locations]
+}
+
+run "rejects_a_state_prefix_with_a_template_marker" {
+  command = plan
+
+  module {
+    source = "./modules/cloud-scanner-role"
+  }
+
+  variables {
+    state_locations = [{ bucket = "example-state", prefix = "prod/$${var.env}/" }]
+  }
+
+  expect_failures = [var.state_locations]
+}
+
+# kms:Decrypt takes a key ARN, never an alias ARN: an alias in the policy would
+# grant nothing, because the S3 call arrives as the key ARN.
+run "rejects_a_kms_alias_arn" {
+  command = plan
+
+  module {
+    source = "./modules/cloud-scanner-role"
+  }
+
+  variables {
+    state_locations = [{
+      bucket      = "example-state"
+      prefix      = "prod/"
+      kms_key_arn = "arn:aws:kms:eu-west-1:111111111111:alias/example-state"
+    }]
+  }
+
+  expect_failures = [var.state_locations]
+}
+
+# Two prefixes in one bucket share one statement, conditioned on both, so a
+# bucket can never be listed under another bucket's prefix.
+run "one_list_statement_per_bucket" {
+  command = plan
+
+  module {
+    source = "./modules/cloud-scanner-role"
+  }
+
+  variables {
+    state_locations = [
+      { bucket = "example-state", prefix = "prod/" },
+      { bucket = "example-state", prefix = "staging/" },
+      { bucket = "example-other-state", prefix = "prod/" },
+    ]
+  }
+
+  assert {
+    condition     = length([for s in jsondecode(output.iac_state_policy_document).Statement : s if startswith(s.Sid, "IacStateListRegisteredPrefixes")]) == 2
+    error_message = "Two buckets must produce two s3:ListBucket statements, whatever the number of prefixes."
+  }
+
+  assert {
+    condition = sort(flatten([
+      for s in jsondecode(output.iac_state_policy_document).Statement : s.Condition.StringLike["s3:prefix"] if s.Resource[0] == "arn:aws:s3:::example-state" && startswith(s.Sid, "IacStateListRegisteredPrefixes")
+    ])) == sort(["prod/", "prod/*", "staging/", "staging/*"])
+    error_message = "A bucket's statement must carry only that bucket's prefixes."
   }
 }

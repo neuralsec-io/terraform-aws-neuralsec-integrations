@@ -21,7 +21,7 @@ There is no upper bound. Each module declares its own requirement and
 
 | Module | What it creates |
 | :--- | :--- |
-| `modules/cloud-scanner-role` | read-only role per customer account, trusted only by the Neuralsec broker with the ExternalId of the connection; for EKS it also ships a read-only RBAC ClusterRole manifest to apply per cluster |
+| `modules/cloud-scanner-role` | read-only role per customer account, trusted only by the Neuralsec broker with the ExternalId of the connection; for EKS it also ships a read-only RBAC ClusterRole manifest to apply per cluster, and the `state_locations` input scopes the one object read the scanner is allowed (Terraform and Pulumi state under a registered bucket prefix) |
 | `modules/cloud-scanner-org` | read-only role for the management or delegated administrator account, with the `organizations` read actions |
 | `modules/cloud-scanner-org/org-rollout` | `cloud-scanner-role` in every active account of an organization, for OpenTofu or plain Terraform |
 | `modules/policy` | the action list export and the chunker that splits it across managed policies |

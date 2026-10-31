@@ -28,6 +28,7 @@ Neuralsec.
 | `member_access_role_name` | string | `OrganizationAccountAccessRole` | Your admin role, used only by this Terraform run |
 | `member_account_ids` | list(string) | `[]` | Accounts the rollout manages. Required by the OpenTofu path |
 | `exclude_account_ids` | list(string) | `[]` | Accounts to leave out even when ACTIVE |
+| `state_locations` | list(object) | `[]` | IaC state bucket prefixes every member role may read, passed to `cloud-scanner-role` unchanged |
 
 Accounts reported `SUSPENDED` or `PENDING_CLOSURE` by
 `aws_organizations_organization` are never given a role and are listed in the

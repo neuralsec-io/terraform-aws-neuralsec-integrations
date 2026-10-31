@@ -52,3 +52,16 @@ variable "exclude_account_ids" {
     error_message = "exclude_account_ids must hold 12 digit account IDs."
   }
 }
+
+variable "state_locations" {
+  description = "Terraform or Pulumi state bucket prefixes the scanner may read, applied to every member role. The cloud-scanner-role module validates and encodes them; see its README."
+  type = list(object({
+    bucket      = string
+    prefix      = optional(string, "")
+    tool        = optional(string, "terraform")
+    region      = optional(string, null)
+    kms_key_arn = optional(string, "")
+  }))
+  default  = []
+  nullable = false
+}

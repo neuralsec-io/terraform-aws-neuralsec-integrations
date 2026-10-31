@@ -3,6 +3,13 @@
 # (tools/cfngen asserts that half). Plan only with a mocked AWS provider.
 
 mock_provider "aws" {
+  mock_data "aws_region" {
+    defaults = {
+      name   = "eu-west-1"
+      region = "eu-west-1"
+    }
+  }
+
   mock_resource "aws_iam_role" {
     defaults = {
       arn = "arn:aws:iam::111111111111:role/neuralsec-cloud-scanner"
