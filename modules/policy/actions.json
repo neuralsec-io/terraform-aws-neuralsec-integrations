@@ -1,5 +1,5 @@
 {
-  "version": "c49126fa",
+  "version": "bd6f6650",
   "account": [
     "access-analyzer:ListAnalyzers",
     "apigateway:GET",
@@ -63,6 +63,7 @@
     "ec2:GetSnapshotBlockPublicAccessState",
     "ecr:DescribeRepositories",
     "ecr:GetLifecyclePolicy",
+    "ecr:GetRegistryScanningConfiguration",
     "ecr:GetRepositoryPolicy",
     "ecr:ListTagsForResource",
     "ecs:DescribeClusters",
@@ -115,6 +116,7 @@
     "iam:ListInstanceProfiles",
     "iam:ListMFADevices",
     "iam:ListOpenIDConnectProviders",
+    "iam:ListOrganizationsFeatures",
     "iam:ListPolicies",
     "iam:ListRoles",
     "iam:ListSAMLProviders",
@@ -180,6 +182,9 @@
     "sqs:ListQueues",
     "ssm:DescribeAssociation",
     "ssm:ListAssociations",
+    "states:DescribeStateMachine",
+    "states:ListStateMachines",
+    "states:ListTagsForResource",
     "sts:GetCallerIdentity"
   ],
   "org_reader": [
