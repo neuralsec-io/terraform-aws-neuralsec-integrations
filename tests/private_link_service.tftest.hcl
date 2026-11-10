@@ -1,7 +1,8 @@
-# private-link-service module. Plan only with mocked AWS and time providers: no
+# private-link-service module. Run with mocked AWS and time providers: no
 # credentials, no API calls. It covers the one-target-set rule, the role ARN
-# validation, the cross-region supported_regions list, the bring-your-own
-# load balancer path, the single allowed principal and the release tags.
+# validation, the eu-west-1 Neuralsec region default, the cross-region
+# supported_regions list, the bring-your-own load balancer path, the single
+# allowed principal and the release tags.
 
 mock_provider "aws" {
   mock_data "aws_region" {
@@ -64,7 +65,6 @@ variables {
   neuralsec_org_id        = "00000000-0000-4000-8000-000000000000"
   neuralsec_org_slug      = "example"
   neuralsec_principal_arn = "arn:aws:iam::111111111111:role/neuralsec-app"
-  neuralsec_region        = "eu-west-1"
   vpc_id                  = "vpc-0123456789abcdef0"
   subnet_ids = [
     "subnet-0123456789abcdef0",
@@ -222,6 +222,28 @@ run "cross_region_adds_both_regions" {
       toset(aws_vpc_endpoint_service.this.supported_regions) == toset(["eu-west-1", "us-east-1"])
     )
     error_message = "A Neuralsec region other than the stack region must be enabled next to the stack region, which AWS always reports as supported."
+  }
+}
+
+# Neuralsec runs in eu-west-1, which is now the default, so a customer plan
+# leaves the input out. An apply must succeed and behave exactly as passing
+# eu-west-1 by hand did: this suite's stack region is eu-west-1, so the endpoint
+# service is not asked for a cross-region list and adds none.
+run "default_region_is_eu_west_1" {
+  command = apply
+
+  module {
+    source = "./modules/private-link-service"
+  }
+
+  assert {
+    condition     = var.neuralsec_region == "eu-west-1"
+    error_message = "neuralsec_region must default to eu-west-1, the region Neuralsec runs in."
+  }
+
+  assert {
+    condition     = local.cross_region == false
+    error_message = "With the default equal to the stack region, supported_regions stays unset, as it did when eu-west-1 was passed by hand."
   }
 }
 

@@ -32,7 +32,7 @@ load balancer, target group, listener and security group.
 | `neuralsec_org_id` | string | required | Neuralsec organization UUID, tag `neuralsec:org_id` |
 | `neuralsec_org_slug` | string | required | Neuralsec organization slug, tag `neuralsec:org_slug` |
 | `neuralsec_principal_arn` | string | required | ARN of the Neuralsec IAM role, the only allowed principal |
-| `neuralsec_region` | string | required | Region of the Neuralsec consumer, for example `eu-west-1` |
+| `neuralsec_region` | string | `eu-west-1` | Region Neuralsec runs in, left unset; listed next to the stack region when it differs |
 | `vpc_id` | string | required | VPC that holds the service |
 | `subnet_ids` | list(string) | required | at least two private subnets the load balancer uses |
 | `target_ips` | list(string) | `[]` | private IPv4 addresses of the service. Set exactly one of `target_ips` and `target_instance_ids` unless `existing_nlb_arn` is set |
@@ -68,7 +68,8 @@ security group belongs to you, not to this module.
 
 ## Cross-region
 
-When `neuralsec_region` differs from the region of the stack, the endpoint
+Neuralsec runs in `eu-west-1`, which is the default of `neuralsec_region`: leave
+the input unset. When it differs from the region of the stack, the endpoint
 service lists both regions in `supported_regions`: your own region (AWS always
 reports the service's home region as supported) and the Neuralsec region, so
 the Neuralsec endpoint can connect across regions and a later plan shows no
@@ -85,7 +86,6 @@ module "neuralsec_private_link_service" {
   neuralsec_org_id        = "00000000-0000-4000-8000-000000000000"
   neuralsec_org_slug      = "example"
   neuralsec_principal_arn = "arn:aws:iam::111111111111:role/neuralsec-app"
-  neuralsec_region        = "eu-west-1"
 
   vpc_id     = "vpc-0123456789abcdef0"
   subnet_ids = ["subnet-0123456789abcdef0", "subnet-0123456789abcdef1"]
@@ -109,5 +109,5 @@ terraform init -backend=false && terraform test
 tofu init -backend=false && tofu test
 ```
 
-The tests plan against a mocked AWS and time provider, so they need no
+The tests run against a mocked AWS and time provider, so they need no
 credentials and make no API calls.

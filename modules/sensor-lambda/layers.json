@@ -4,7 +4,7 @@
     "x86_64": "neuralsec-sensor-x86_64"
   },
   "account": "286123791480",
-  "version": 8,
+  "version": 9,
   "wrapper": "/opt/bin/sensor-wrapper",
   "hooks": {
     "glibc": "/opt/lib/libsensor_hook.so",
@@ -12,28 +12,28 @@
   },
   "regions": {
     "ap-northeast-1": {
-      "arm64": "arn:aws:lambda:ap-northeast-1:286123791480:layer:neuralsec-sensor-arm64:8",
-      "x86_64": "arn:aws:lambda:ap-northeast-1:286123791480:layer:neuralsec-sensor-x86_64:8"
+      "arm64": "arn:aws:lambda:ap-northeast-1:286123791480:layer:neuralsec-sensor-arm64:9",
+      "x86_64": "arn:aws:lambda:ap-northeast-1:286123791480:layer:neuralsec-sensor-x86_64:9"
     },
     "eu-central-1": {
-      "arm64": "arn:aws:lambda:eu-central-1:286123791480:layer:neuralsec-sensor-arm64:8",
-      "x86_64": "arn:aws:lambda:eu-central-1:286123791480:layer:neuralsec-sensor-x86_64:8"
+      "arm64": "arn:aws:lambda:eu-central-1:286123791480:layer:neuralsec-sensor-arm64:9",
+      "x86_64": "arn:aws:lambda:eu-central-1:286123791480:layer:neuralsec-sensor-x86_64:9"
     },
     "eu-west-1": {
-      "arm64": "arn:aws:lambda:eu-west-1:286123791480:layer:neuralsec-sensor-arm64:8",
-      "x86_64": "arn:aws:lambda:eu-west-1:286123791480:layer:neuralsec-sensor-x86_64:8"
+      "arm64": "arn:aws:lambda:eu-west-1:286123791480:layer:neuralsec-sensor-arm64:9",
+      "x86_64": "arn:aws:lambda:eu-west-1:286123791480:layer:neuralsec-sensor-x86_64:9"
     },
     "us-east-1": {
-      "arm64": "arn:aws:lambda:us-east-1:286123791480:layer:neuralsec-sensor-arm64:8",
-      "x86_64": "arn:aws:lambda:us-east-1:286123791480:layer:neuralsec-sensor-x86_64:8"
+      "arm64": "arn:aws:lambda:us-east-1:286123791480:layer:neuralsec-sensor-arm64:9",
+      "x86_64": "arn:aws:lambda:us-east-1:286123791480:layer:neuralsec-sensor-x86_64:9"
     },
     "us-east-2": {
-      "arm64": "arn:aws:lambda:us-east-2:286123791480:layer:neuralsec-sensor-arm64:8",
-      "x86_64": "arn:aws:lambda:us-east-2:286123791480:layer:neuralsec-sensor-x86_64:8"
+      "arm64": "arn:aws:lambda:us-east-2:286123791480:layer:neuralsec-sensor-arm64:9",
+      "x86_64": "arn:aws:lambda:us-east-2:286123791480:layer:neuralsec-sensor-x86_64:9"
     },
     "us-west-2": {
-      "arm64": "arn:aws:lambda:us-west-2:286123791480:layer:neuralsec-sensor-arm64:8",
-      "x86_64": "arn:aws:lambda:us-west-2:286123791480:layer:neuralsec-sensor-x86_64:8"
+      "arm64": "arn:aws:lambda:us-west-2:286123791480:layer:neuralsec-sensor-arm64:9",
+      "x86_64": "arn:aws:lambda:us-west-2:286123791480:layer:neuralsec-sensor-x86_64:9"
     }
   }
 }

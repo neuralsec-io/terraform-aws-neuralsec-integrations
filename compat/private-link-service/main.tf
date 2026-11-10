@@ -23,7 +23,6 @@ module "private_link_service" {
   neuralsec_org_id        = "00000000-0000-4000-8000-000000000000"
   neuralsec_org_slug      = "example"
   neuralsec_principal_arn = "arn:aws:iam::111111111111:role/neuralsec-app"
-  neuralsec_region        = "eu-west-1"
 
   vpc_id     = "vpc-0123456789abcdef0"
   subnet_ids = ["subnet-0123456789abcdef0", "subnet-0123456789abcdef1"]

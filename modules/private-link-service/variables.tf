@@ -39,8 +39,9 @@ variable "neuralsec_principal_arn" {
 }
 
 variable "neuralsec_region" {
-  description = "Region of the Neuralsec consumer. The endpoint service advertises it as a supported region when it differs from the region of this stack."
+  description = "Region Neuralsec runs in. It is eu-west-1 and should be left unset: the endpoint service advertises it as a supported region when it differs from the region of this stack."
   type        = string
+  default     = "eu-west-1"
 
   validation {
     condition     = can(regex("^[a-z]{2}(-gov)?-[a-z]+-[0-9]$", var.neuralsec_region))
