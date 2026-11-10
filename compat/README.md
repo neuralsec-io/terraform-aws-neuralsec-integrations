@@ -5,3 +5,6 @@ and AWS provider versions the modules support. `sensor-lambda` needs Terraform
 1.6 and AWS provider 5.0, so it has its own root in `sensor-lambda/`, checked at
 its own floor. `sensor-eks` needs the Helm provider 2.17 or newer, so it has its
 own root in `sensor-eks/`, checked at the 2.17 floor and against the 3.x line.
+`private-link-service` needs AWS provider 5.79, the first release with
+`supported_regions` on `aws_vpc_endpoint_service`, and the time provider, so it
+has its own root in `private-link-service/`.

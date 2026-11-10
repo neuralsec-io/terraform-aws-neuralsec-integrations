@@ -56,7 +56,7 @@ run "release_installs_the_chart_from_the_oci_repository" {
       && helm_release.sensor.namespace == "neuralsec"
       && helm_release.sensor.create_namespace == true
       && helm_release.sensor.chart == "neuralsec-sensor"
-      && helm_release.sensor.repository == "oci://public.ecr.aws/neuralsec/charts"
+      && helm_release.sensor.repository == "oci://public.ecr.aws/r6k8r1v7/charts"
       && helm_release.sensor.version == "0.1.0"
     )
     error_message = "the release must install the chart from the OCI repository at the pinned chart version"

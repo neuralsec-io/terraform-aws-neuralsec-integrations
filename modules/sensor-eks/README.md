@@ -30,7 +30,7 @@ The provider must point at the cluster the release is installed into.
 | `cluster_name` | string | required | Cluster name reported with the node metadata, rendered as `clusterName` |
 | `image_digest` | string | required | Image digest as `sha256:` and 64 lowercase hex characters, rendered as `image.digest` |
 | `chart_version` | string | `0.1.0` | Chart version to install |
-| `chart_repository` | string | `oci://public.ecr.aws/neuralsec/charts` | OCI repository holding the chart |
+| `chart_repository` | string | `oci://public.ecr.aws/r6k8r1v7/charts` | OCI repository holding the chart |
 | `namespace` | string | `neuralsec` | Namespace the release is installed into |
 | `create_namespace` | bool | `true` | Create the namespace when it does not exist |
 | `values` | any | `{}` | Extra chart values, merged last over the rendered values |

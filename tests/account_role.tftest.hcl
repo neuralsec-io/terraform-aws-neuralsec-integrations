@@ -269,6 +269,79 @@ run "eks_access_entry_carries_the_rbac_group" {
   }
 }
 
+# Customers that restrict the EKS public endpoint need the addresses the
+# scanner connects from. The lists are constants of the module, so this pins
+# their exact content: one IPv6 /56 and three IPv4 /32s, in the published
+# order, with the combined list IPv6 first.
+run "scanner_egress_ipv4_cidrs_are_the_published_addresses" {
+  command = plan
+
+  module {
+    source = "./modules/cloud-scanner-role"
+  }
+
+  assert {
+    condition = output.scanner_egress_ipv4_cidrs == [
+      "3.248.10.74/32",
+      "34.241.8.107/32",
+      "52.16.218.0/32",
+    ]
+    error_message = "The IPv4 egress list must be the three published IPv4 addresses, each a /32."
+  }
+
+  assert {
+    condition     = length(distinct(output.scanner_egress_ipv4_cidrs)) == length(output.scanner_egress_ipv4_cidrs)
+    error_message = "The IPv4 egress list must not repeat an address."
+  }
+
+  assert {
+    condition = alltrue([
+      for cidr in output.scanner_egress_ipv4_cidrs :
+      can(regex("^([0-9]{1,3}\\.){3}[0-9]{1,3}/32$", cidr))
+    ])
+    error_message = "Every IPv4 egress entry must be an IPv4 /32, because the scanner's IPv4 path uses fixed addresses."
+  }
+}
+
+run "scanner_egress_ipv6_cidrs_are_the_published_prefix" {
+  command = plan
+
+  module {
+    source = "./modules/cloud-scanner-role"
+  }
+
+  assert {
+    condition     = output.scanner_egress_ipv6_cidrs == ["2a05:d018:e21:f00::/56"]
+    error_message = "The IPv6 egress list must be the one published /56."
+  }
+
+  assert {
+    condition = alltrue([
+      for cidr in output.scanner_egress_ipv6_cidrs :
+      can(regex("^[0-9a-f:]+/[0-9]{1,3}$", cidr)) && strcontains(cidr, ":") && !strcontains(cidr, ".")
+    ])
+    error_message = "Every IPv6 egress entry must be a bare IPv6 CIDR, because the scanner's IPv6 path is IPv6 only."
+  }
+}
+
+run "scanner_egress_cidrs_combine_both_families_ipv6_first" {
+  command = plan
+
+  module {
+    source = "./modules/cloud-scanner-role"
+  }
+
+  assert {
+    condition     = output.scanner_egress_cidrs == concat(output.scanner_egress_ipv6_cidrs, output.scanner_egress_ipv4_cidrs)
+    error_message = "scanner_egress_cidrs is the convenience list of both families, IPv6 first."
+  }
+
+  assert {
+    condition     = length(distinct(output.scanner_egress_cidrs)) == length(output.scanner_egress_cidrs)
+    error_message = "The combined egress list must not repeat a prefix."
+  }
+}
+
 run "rbac_manifest_is_read_only_rbac_only" {
   command = plan
 

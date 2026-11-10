@@ -24,6 +24,26 @@ locals {
   eks_rbac_group = "neuralsec:scanner-rbac-view"
 
   eks_view_policy_arn = "arn:${data.aws_partition.current.partition}:eks::aws:cluster-access-policy/AmazonEKSViewPolicy"
+
+  # Source addresses every scan connects from. The scanner runs dual stack and
+  # prefers IPv6, so towards a dual-stack endpoint it egresses from this one
+  # /56. The three Elastic IPs carry the IPv4 path and stay fixed across
+  # instance replacement.
+  scanner_egress_ipv6_cidrs = [
+    "2a05:d018:e21:f00::/56",
+  ]
+
+  scanner_egress_ipv4_cidrs = [
+    "3.248.10.74/32",
+    "34.241.8.107/32",
+    "52.16.218.0/32",
+  ]
+
+  # Both families, IPv6 first. A dual-stack (ipv6) cluster created after
+  # October 2024 takes this whole list in public_access_cidrs, because it
+  # accepts IPv4 and IPv6 CIDRs together and the scanner prefers IPv6 and
+  # falls back to IPv4. Every other cluster takes scanner_egress_ipv4_cidrs.
+  scanner_egress_cidrs = concat(local.scanner_egress_ipv6_cidrs, local.scanner_egress_ipv4_cidrs)
 }
 
 data "aws_partition" "current" {}

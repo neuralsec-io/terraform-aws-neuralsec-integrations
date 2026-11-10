@@ -11,8 +11,9 @@ Terraform modules for installing Neuralsec into an AWS account or an AWS Organiz
 | AWS provider | >= 5.34 for `cloud-scanner-role` (EKS access entries), >= 4.0 for the other modules |
 
 `sensor-lambda` needs Terraform >= 1.6 or OpenTofu >= 1.6, and AWS provider
->= 5.0, < 7.0. `sensor-eks` needs Helm provider >= 2.17, < 4.0; every other
-module works at the floors above.
+>= 5.0, < 7.0. `sensor-eks` needs Helm provider >= 2.17, < 4.0.
+`private-link-service` needs AWS provider >= 5.79.0 and the `hashicorp/time`
+provider >= 0.9.0; every other module works at the floors above.
 
 There is no upper bound. Each module declares its own requirement and
 `terraform/compat/` holds the minimum-version check CI runs against them.
@@ -29,6 +30,7 @@ There is no upper bound. Each module declares its own requirement and
 | `modules/sensor-ecs-sidecar` | no resources: an ECS task definition rewritten with the Neuralsec sensor init and sidecar containers, the shared volumes and the PID mode |
 | `modules/sensor-eks` | a Helm release of the Neuralsec sensor chart, which runs the DaemonSet on every Linux node of the cluster |
 | `modules/sensor-ec2` | an SSM Command document and association that install the Neuralsec sensor on EC2 instances through SSM |
+| `modules/private-link-service` | an internal Network Load Balancer, target group, listener and endpoint service that publish a private HTTPS service to Neuralsec over AWS PrivateLink, with only the Neuralsec role allowed to connect |
 
 Source addresses use the Registry form:
 

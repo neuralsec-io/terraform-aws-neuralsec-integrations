@@ -1,6 +1,7 @@
 # Shared enable vectors: the behaviour the Neuralsec sensor enable path must
-# reproduce on every case. The vectors are shared with the enable CLI, so the
-# expected values are fixed; do not edit them by hand.
+# reproduce on every case. The vectors are shared with the enable CLI; the
+# expected layer ARNs come from layers.json, the table the module reads, so they
+# hold on the placeholder table and after a release manifest fills it.
 
 run "enable_fresh_managed_runtime" {
   command = plan
@@ -24,7 +25,7 @@ run "enable_fresh_managed_runtime" {
     error_message = "enable_fresh_managed_runtime: environment differs from the shared vector"
   }
   assert {
-    condition     = jsonencode(output.layers) == jsonencode(["arn:aws:lambda:us-east-1:123456789012:layer:neuralsec-sensor-x86_64:7"])
+    condition     = jsonencode(output.layers) == jsonencode([jsondecode(file("${path.root}/layers.json")).regions["us-east-1"].x86_64])
     error_message = "enable_fresh_managed_runtime: layers differ from the shared vector"
   }
   assert {
@@ -59,7 +60,7 @@ run "enable_keeps_empty_preload" {
     error_message = "enable_keeps_empty_preload: environment differs from the shared vector"
   }
   assert {
-    condition     = jsonencode(output.layers) == jsonencode(["arn:aws:lambda:us-east-1:123456789012:layer:neuralsec-sensor-x86_64:7"])
+    condition     = jsonencode(output.layers) == jsonencode([jsondecode(file("${path.root}/layers.json")).regions["us-east-1"].x86_64])
     error_message = "enable_keeps_empty_preload: layers differ from the shared vector"
   }
   assert {
@@ -94,7 +95,7 @@ run "enable_idempotent" {
     error_message = "enable_idempotent: environment differs from the shared vector"
   }
   assert {
-    condition     = jsonencode(output.layers) == jsonencode(["arn:aws:lambda:us-east-1:123456789012:layer:neuralsec-sensor-x86_64:7"])
+    condition     = jsonencode(output.layers) == jsonencode([jsondecode(file("${path.root}/layers.json")).regions["us-east-1"].x86_64])
     error_message = "enable_idempotent: layers differ from the shared vector"
   }
   assert {
@@ -129,7 +130,7 @@ run "enable_zip_mode_b_without_layer_adds_layer" {
     error_message = "enable_zip_mode_b_without_layer_adds_layer: environment differs from the shared vector"
   }
   assert {
-    condition     = jsonencode(output.layers) == jsonencode(["arn:aws:lambda:us-east-1:123456789012:layer:neuralsec-sensor-x86_64:7"])
+    condition     = jsonencode(output.layers) == jsonencode([jsondecode(file("${path.root}/layers.json")).regions["us-east-1"].x86_64])
     error_message = "enable_zip_mode_b_without_layer_adds_layer: layers differ from the shared vector"
   }
   assert {
@@ -164,7 +165,7 @@ run "enable_migrates_existing_wrapper" {
     error_message = "enable_migrates_existing_wrapper: environment differs from the shared vector"
   }
   assert {
-    condition     = jsonencode(output.layers) == jsonencode(["arn:aws:lambda:us-east-1:123456789012:layer:neuralsec-sensor-x86_64:7"])
+    condition     = jsonencode(output.layers) == jsonencode([jsondecode(file("${path.root}/layers.json")).regions["us-east-1"].x86_64])
     error_message = "enable_migrates_existing_wrapper: layers differ from the shared vector"
   }
   assert {
@@ -199,7 +200,7 @@ run "enable_prepends_to_existing_chain" {
     error_message = "enable_prepends_to_existing_chain: environment differs from the shared vector"
   }
   assert {
-    condition     = jsonencode(output.layers) == jsonencode(["arn:aws:lambda:us-east-1:123456789012:layer:neuralsec-sensor-x86_64:7"])
+    condition     = jsonencode(output.layers) == jsonencode([jsondecode(file("${path.root}/layers.json")).regions["us-east-1"].x86_64])
     error_message = "enable_prepends_to_existing_chain: layers differ from the shared vector"
   }
   assert {
@@ -234,7 +235,7 @@ run "enable_chain_dedupes_existing_entry" {
     error_message = "enable_chain_dedupes_existing_entry: environment differs from the shared vector"
   }
   assert {
-    condition     = jsonencode(output.layers) == jsonencode(["arn:aws:lambda:us-east-1:123456789012:layer:neuralsec-sensor-x86_64:7"])
+    condition     = jsonencode(output.layers) == jsonencode([jsondecode(file("${path.root}/layers.json")).regions["us-east-1"].x86_64])
     error_message = "enable_chain_dedupes_existing_entry: layers differ from the shared vector"
   }
   assert {
@@ -269,7 +270,7 @@ run "enable_replaces_old_layer_version" {
     error_message = "enable_replaces_old_layer_version: environment differs from the shared vector"
   }
   assert {
-    condition     = jsonencode(output.layers) == jsonencode(["arn:aws:lambda:us-east-1:123456789012:layer:vendor-a:4", "arn:aws:lambda:us-east-1:123456789012:layer:neuralsec-sensor-x86_64:7", "arn:aws:lambda:us-east-1:123456789012:layer:vendor-b:2"])
+    condition     = jsonencode(output.layers) == jsonencode(["arn:aws:lambda:us-east-1:123456789012:layer:vendor-a:4", jsondecode(file("${path.root}/layers.json")).regions["us-east-1"].x86_64, "arn:aws:lambda:us-east-1:123456789012:layer:vendor-b:2"])
     error_message = "enable_replaces_old_layer_version: layers differ from the shared vector"
   }
   assert {
@@ -324,7 +325,7 @@ run "enable_keeps_duplicate_layers" {
     error_message = "enable_keeps_duplicate_layers: environment differs from the shared vector"
   }
   assert {
-    condition     = jsonencode(output.layers) == jsonencode(["arn:aws:lambda:us-east-1:123456789012:layer:vendor-a:1", "arn:aws:lambda:us-east-1:123456789012:layer:vendor-a:1", "arn:aws:lambda:us-east-1:123456789012:layer:neuralsec-sensor-x86_64:7"])
+    condition     = jsonencode(output.layers) == jsonencode(["arn:aws:lambda:us-east-1:123456789012:layer:vendor-a:1", "arn:aws:lambda:us-east-1:123456789012:layer:vendor-a:1", jsondecode(file("${path.root}/layers.json")).regions["us-east-1"].x86_64])
     error_message = "enable_keeps_duplicate_layers: layers differ from the shared vector"
   }
   assert {
@@ -399,7 +400,7 @@ run "enable_provided_runtime_preload" {
     error_message = "enable_provided_runtime_preload: environment differs from the shared vector"
   }
   assert {
-    condition     = jsonencode(output.layers) == jsonencode(["arn:aws:lambda:us-east-1:123456789012:layer:neuralsec-sensor-x86_64:7"])
+    condition     = jsonencode(output.layers) == jsonencode([jsondecode(file("${path.root}/layers.json")).regions["us-east-1"].x86_64])
     error_message = "enable_provided_runtime_preload: layers differ from the shared vector"
   }
   assert {
@@ -436,7 +437,7 @@ run "enable_preload_musl" {
     error_message = "enable_preload_musl: environment differs from the shared vector"
   }
   assert {
-    condition     = jsonencode(output.layers) == jsonencode(["arn:aws:lambda:us-east-1:123456789012:layer:neuralsec-sensor-x86_64:7"])
+    condition     = jsonencode(output.layers) == jsonencode([jsondecode(file("${path.root}/layers.json")).regions["us-east-1"].x86_64])
     error_message = "enable_preload_musl: layers differ from the shared vector"
   }
   assert {
@@ -472,7 +473,7 @@ run "enable_preload_converts_wrapper" {
     error_message = "enable_preload_converts_wrapper: environment differs from the shared vector"
   }
   assert {
-    condition     = jsonencode(output.layers) == jsonencode(["arn:aws:lambda:us-east-1:123456789012:layer:neuralsec-sensor-x86_64:7"])
+    condition     = jsonencode(output.layers) == jsonencode([jsondecode(file("${path.root}/layers.json")).regions["us-east-1"].x86_64])
     error_message = "enable_preload_converts_wrapper: layers differ from the shared vector"
   }
   assert {
@@ -549,7 +550,7 @@ run "enable_arm64_layer" {
     error_message = "enable_arm64_layer: environment differs from the shared vector"
   }
   assert {
-    condition     = jsonencode(output.layers) == jsonencode(["arn:aws:lambda:us-east-1:123456789012:layer:neuralsec-sensor-arm64:7"])
+    condition     = jsonencode(output.layers) == jsonencode([jsondecode(file("${path.root}/layers.json")).regions["us-east-1"].arm64])
     error_message = "enable_arm64_layer: layers differ from the shared vector"
   }
   assert {
@@ -605,7 +606,7 @@ run "enable_egress_proxy_fresh" {
     error_message = "enable_egress_proxy_fresh: environment differs from the shared vector"
   }
   assert {
-    condition     = jsonencode(output.layers) == jsonencode(["arn:aws:lambda:us-east-1:123456789012:layer:neuralsec-sensor-x86_64:7"])
+    condition     = jsonencode(output.layers) == jsonencode([jsondecode(file("${path.root}/layers.json")).regions["us-east-1"].x86_64])
     error_message = "enable_egress_proxy_fresh: layers differ from the shared vector"
   }
   assert {
@@ -641,7 +642,7 @@ run "enable_egress_proxy_custom_port" {
     error_message = "enable_egress_proxy_custom_port: environment differs from the shared vector"
   }
   assert {
-    condition     = jsonencode(output.layers) == jsonencode(["arn:aws:lambda:us-east-1:123456789012:layer:neuralsec-sensor-x86_64:7"])
+    condition     = jsonencode(output.layers) == jsonencode([jsondecode(file("${path.root}/layers.json")).regions["us-east-1"].x86_64])
     error_message = "enable_egress_proxy_custom_port: layers differ from the shared vector"
   }
   assert {
@@ -677,7 +678,7 @@ run "enable_egress_proxy_merges_no_proxy" {
     error_message = "enable_egress_proxy_merges_no_proxy: environment differs from the shared vector"
   }
   assert {
-    condition     = jsonencode(output.layers) == jsonencode(["arn:aws:lambda:us-east-1:123456789012:layer:neuralsec-sensor-x86_64:7"])
+    condition     = jsonencode(output.layers) == jsonencode([jsondecode(file("${path.root}/layers.json")).regions["us-east-1"].x86_64])
     error_message = "enable_egress_proxy_merges_no_proxy: layers differ from the shared vector"
   }
   assert {
@@ -755,7 +756,7 @@ run "enable_egress_proxy_idempotent" {
     error_message = "enable_egress_proxy_idempotent: environment differs from the shared vector"
   }
   assert {
-    condition     = jsonencode(output.layers) == jsonencode(["arn:aws:lambda:us-east-1:123456789012:layer:neuralsec-sensor-x86_64:7"])
+    condition     = jsonencode(output.layers) == jsonencode([jsondecode(file("${path.root}/layers.json")).regions["us-east-1"].x86_64])
     error_message = "enable_egress_proxy_idempotent: layers differ from the shared vector"
   }
   assert {
@@ -791,7 +792,7 @@ run "enable_egress_proxy_warns" {
     error_message = "enable_egress_proxy_warns: environment differs from the shared vector"
   }
   assert {
-    condition     = jsonencode(output.layers) == jsonencode(["arn:aws:lambda:us-east-1:123456789012:layer:neuralsec-sensor-x86_64:7"])
+    condition     = jsonencode(output.layers) == jsonencode([jsondecode(file("${path.root}/layers.json")).regions["us-east-1"].x86_64])
     error_message = "enable_egress_proxy_warns: layers differ from the shared vector"
   }
   assert {
@@ -897,7 +898,7 @@ run "enable_egress_proxy_extends_added_marker" {
     error_message = "enable_egress_proxy_extends_added_marker: environment differs from the shared vector"
   }
   assert {
-    condition     = jsonencode(output.layers) == jsonencode(["arn:aws:lambda:us-east-1:123456789012:layer:neuralsec-sensor-x86_64:7"])
+    condition     = jsonencode(output.layers) == jsonencode([jsondecode(file("${path.root}/layers.json")).regions["us-east-1"].x86_64])
     error_message = "enable_egress_proxy_extends_added_marker: layers differ from the shared vector"
   }
   assert {
@@ -932,7 +933,7 @@ run "enable_snapstart_warns" {
     error_message = "enable_snapstart_warns: environment differs from the shared vector"
   }
   assert {
-    condition     = jsonencode(output.layers) == jsonencode(["arn:aws:lambda:us-east-1:123456789012:layer:neuralsec-sensor-x86_64:7"])
+    condition     = jsonencode(output.layers) == jsonencode([jsondecode(file("${path.root}/layers.json")).regions["us-east-1"].x86_64])
     error_message = "enable_snapstart_warns: layers differ from the shared vector"
   }
   assert {
@@ -967,7 +968,7 @@ run "enable_replaces_all_sensor_layers" {
     error_message = "enable_replaces_all_sensor_layers: environment differs from the shared vector"
   }
   assert {
-    condition     = jsonencode(output.layers) == jsonencode(["arn:aws:lambda:us-east-1:123456789012:layer:neuralsec-sensor-x86_64:7", "arn:aws:lambda:us-east-1:123456789012:layer:vendor-a:1"])
+    condition     = jsonencode(output.layers) == jsonencode([jsondecode(file("${path.root}/layers.json")).regions["us-east-1"].x86_64, "arn:aws:lambda:us-east-1:123456789012:layer:vendor-a:1"])
     error_message = "enable_replaces_all_sensor_layers: layers differ from the shared vector"
   }
   assert {

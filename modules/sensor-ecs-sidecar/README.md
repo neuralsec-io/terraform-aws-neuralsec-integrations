@@ -105,7 +105,7 @@ module "sensor_ecs_sidecar" {
 
   container_definitions = jsonencode(local.container_definitions)
   app_containers        = ["app"]
-  sidecar_image         = "public.ecr.aws/neuralsec/sensor-ecs@sha256:<64 hex>"
+  sidecar_image         = "public.ecr.aws/r6k8r1v7/sensor-ecs@sha256:<64 hex>"
   endpoint              = "https://sensor.example.com"
   libc                  = { app = "glibc" }
 }

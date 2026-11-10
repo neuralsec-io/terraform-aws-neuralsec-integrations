@@ -32,7 +32,7 @@ variable "chart_version" {
 variable "chart_repository" {
   description = "OCI repository holding the chart."
   type        = string
-  default     = "oci://public.ecr.aws/neuralsec/charts"
+  default     = "oci://public.ecr.aws/r6k8r1v7/charts"
 }
 
 variable "namespace" {

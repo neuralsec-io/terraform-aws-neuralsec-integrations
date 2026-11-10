@@ -36,7 +36,7 @@ module "sensor_ecs_sidecar" {
 
   container_definitions = "[{\"name\":\"app\",\"image\":\"public.ecr.aws/docker/library/eclipse-temurin:21-jre\"}]"
   app_containers        = ["app"]
-  sidecar_image         = "public.ecr.aws/neuralsec/sensor-ecs@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+  sidecar_image         = "public.ecr.aws/r6k8r1v7/sensor-ecs@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
   endpoint              = "https://sensor.example.com"
 }
 

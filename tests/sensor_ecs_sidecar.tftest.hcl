@@ -45,7 +45,7 @@ variables {
   JSON
 
   app_containers = ["app"]
-  sidecar_image  = "public.ecr.aws/neuralsec/sensor-ecs@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+  sidecar_image  = "public.ecr.aws/r6k8r1v7/sensor-ecs@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
   endpoint       = "https://sensor.example.com"
   libc           = {}
 }
@@ -133,7 +133,7 @@ run "sidecar_image_must_be_digest_pinned" {
   }
 
   variables {
-    sidecar_image = "public.ecr.aws/neuralsec/sensor-ecs"
+    sidecar_image = "public.ecr.aws/r6k8r1v7/sensor-ecs"
   }
 
   expect_failures = [var.sidecar_image]
