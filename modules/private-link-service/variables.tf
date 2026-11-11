@@ -69,8 +69,19 @@ variable "subnet_ids" {
   }
 }
 
+variable "target_alb_arn" {
+  description = "ARN of an internal Application Load Balancer to publish, the recommended target: the load balancer keeps a stable ARN while its IP addresses change. Set exactly one of target_alb_arn, target_ips and target_instance_ids, or existing_nlb_arn instead, which rejects an ALB target, and make target_port the port of an ALB listener."
+  type        = string
+  default     = null
+
+  validation {
+    condition     = var.target_alb_arn == null || can(regex("^arn:aws[a-z-]*:elasticloadbalancing:[a-z0-9-]+:[0-9]{12}:loadbalancer/app/.+$", var.target_alb_arn))
+    error_message = "target_alb_arn must be the ARN of an Application Load Balancer."
+  }
+}
+
 variable "target_ips" {
-  description = "Private IPv4 addresses of the service to register as targets. Set exactly one of target_ips and target_instance_ids unless existing_nlb_arn is set."
+  description = "Private IPv4 addresses of the service to register as targets. Set exactly one of target_alb_arn, target_ips and target_instance_ids unless existing_nlb_arn is set, which ignores them."
   type        = list(string)
   default     = []
 
@@ -81,7 +92,7 @@ variable "target_ips" {
 }
 
 variable "target_instance_ids" {
-  description = "Instance ids to register as targets. Set exactly one of target_ips and target_instance_ids unless existing_nlb_arn is set."
+  description = "Instance ids to register as targets. Set exactly one of target_alb_arn, target_ips and target_instance_ids unless existing_nlb_arn is set, which ignores them."
   type        = list(string)
   default     = []
 
@@ -92,7 +103,7 @@ variable "target_instance_ids" {
 }
 
 variable "target_port" {
-  description = "TCP port of the targets. The listener stays on 443, because Neuralsec connects over HTTPS only."
+  description = "TCP port of the targets. The listener stays on 443, because Neuralsec connects over HTTPS only. With target_alb_arn it must be the port of an ALB listener, so a health check reaches the ALB; it defaults to 443, the HTTPS listener."
   type        = number
   default     = 443
 
@@ -109,7 +120,7 @@ variable "acceptance_required" {
 }
 
 variable "existing_nlb_arn" {
-  description = "ARN of an existing internal Network Load Balancer to publish. When set, the module creates only the endpoint service and skips the load balancer, target group, listener and security group."
+  description = "ARN of an existing internal Network Load Balancer to publish. When set, the module creates only the endpoint service and skips the load balancer, target group, listener and security group, so target_ips and target_instance_ids are ignored and an ALB target is rejected."
   type        = string
   default     = null
 

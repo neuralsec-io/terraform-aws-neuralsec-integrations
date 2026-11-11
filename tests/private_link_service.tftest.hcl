@@ -1,8 +1,10 @@
 # private-link-service module. Run with mocked AWS and time providers: no
-# credentials, no API calls. It covers the one-target-set rule, the role ARN
-# validation, the eu-west-1 Neuralsec region default, the cross-region
-# supported_regions list, the bring-your-own load balancer path, the single
-# allowed principal and the release tags.
+# credentials, no API calls. It covers the one-target-set rule, the ignored
+# targets on the existing load balancer path, the ALB target group and its
+# health check, the generated target group name across a target kind change,
+# the role ARN validation, the eu-west-1 Neuralsec region default, the
+# cross-region supported_regions list, the bring-your-own load balancer path,
+# the single allowed principal and the release tags.
 
 mock_provider "aws" {
   mock_data "aws_region" {
@@ -106,6 +108,11 @@ run "ip_targets_publish_the_service" {
   }
 
   assert {
+    condition     = length(aws_lb_listener.this[0].default_action) == 1 && aws_lb_listener.this[0].default_action[0].type == "forward"
+    error_message = "The listener forwards to the target group this module creates."
+  }
+
+  assert {
     condition     = toset([for rule in aws_security_group.this[0].egress : rule.cidr_blocks[0]]) == toset([for address in var.target_ips : "${address}/32"])
     error_message = "The load balancer security group egress is scoped to the target IPs."
   }
@@ -144,6 +151,140 @@ run "instance_targets_use_the_vpc_cidr" {
   }
 }
 
+run "alb_target_uses_an_alb_target_group" {
+  command = plan
+
+  module {
+    source = "./modules/private-link-service"
+  }
+
+  variables {
+    target_ips     = []
+    target_alb_arn = "arn:aws:elasticloadbalancing:eu-west-1:111111111111:loadbalancer/app/registry/0123456789abcdef"
+  }
+
+  assert {
+    condition     = aws_lb_target_group.this[0].target_type == "alb"
+    error_message = "target_alb_arn must produce an alb target group."
+  }
+
+  assert {
+    condition     = aws_lb_target_group.this[0].port == 443 && aws_lb_target_group.this[0].protocol == "TCP"
+    error_message = "The ALB target group forwards TCP to the ALB listener port."
+  }
+
+  assert {
+    condition = (
+      length(aws_lb_target_group_attachment.this) == 1 &&
+      aws_lb_target_group_attachment.this[0].target_id == var.target_alb_arn &&
+      aws_lb_target_group_attachment.this[0].port == 443
+    )
+    error_message = "The ALB is the single attachment, on the target port."
+  }
+
+  assert {
+    condition = (
+      aws_lb_target_group.this[0].health_check[0].protocol == "HTTPS" &&
+      aws_lb_target_group.this[0].health_check[0].port == tostring(var.target_port) &&
+      aws_lb_target_group.this[0].health_check[0].path == "/" &&
+      aws_lb_target_group.this[0].health_check[0].matcher == "200-499"
+    )
+    error_message = "An alb target group needs an HTTPS health check on the ALB listener port: any answer means the ALB is up."
+  }
+
+  assert {
+    condition     = toset([for rule in aws_security_group.this[0].egress : rule.cidr_blocks[0]]) == toset(["10.0.0.0/16"])
+    error_message = "The ALB addresses move within the VPC, so the egress rule covers the VPC CIDR."
+  }
+
+  assert {
+    condition     = aws_lb_listener.this[0].port == 443 && length(aws_vpc_endpoint_service.this.network_load_balancer_arns) == 1
+    error_message = "The private link still publishes the created network load balancer."
+  }
+}
+
+# Changing the target kind replaces the target group. Its name is unique per
+# apply: a generated suffix keeps the old group and the new one apart while
+# both exist, and the Name tag still carries the link name.
+run "target_group_name_is_generated_so_a_kind_change_does_not_fail" {
+  command = plan
+
+  module {
+    source = "./modules/private-link-service"
+  }
+
+  assert {
+    condition     = aws_lb_target_group.this[0].name_prefix == "nspl-"
+    error_message = "The target group name must be generated, so a replacement can create the new group next to the old one."
+  }
+
+  assert {
+    condition     = aws_lb_target_group.this[0].tags["Name"] == var.name
+    error_message = "The generated name must still carry the link name in the Name tag."
+  }
+}
+
+run "rejects_alb_with_ip_targets" {
+  command = plan
+
+  module {
+    source = "./modules/private-link-service"
+  }
+
+  variables {
+    target_alb_arn = "arn:aws:elasticloadbalancing:eu-west-1:111111111111:loadbalancer/app/registry/0123456789abcdef"
+  }
+
+  expect_failures = [aws_vpc_endpoint_service.this]
+}
+
+run "rejects_alb_with_existing_nlb" {
+  command = plan
+
+  module {
+    source = "./modules/private-link-service"
+  }
+
+  variables {
+    target_ips       = []
+    target_alb_arn   = "arn:aws:elasticloadbalancing:eu-west-1:111111111111:loadbalancer/app/registry/0123456789abcdef"
+    existing_nlb_arn = "arn:aws:elasticloadbalancing:eu-west-1:111111111111:loadbalancer/net/existing/0123456789abcdef"
+  }
+
+  expect_failures = [aws_vpc_endpoint_service.this]
+}
+
+run "rejects_alb_with_instance_targets" {
+  command = plan
+
+  module {
+    source = "./modules/private-link-service"
+  }
+
+  variables {
+    target_ips          = []
+    target_alb_arn      = "arn:aws:elasticloadbalancing:eu-west-1:111111111111:loadbalancer/app/registry/0123456789abcdef"
+    target_instance_ids = ["i-0123456789abcdef0"]
+  }
+
+  expect_failures = [aws_vpc_endpoint_service.this]
+}
+
+run "rejects_a_network_load_balancer_arn_as_the_alb" {
+  command = plan
+
+  module {
+    source = "./modules/private-link-service"
+  }
+
+  variables {
+    target_ips     = []
+    target_alb_arn = "arn:aws:elasticloadbalancing:eu-west-1:111111111111:loadbalancer/net/existing/0123456789abcdef"
+  }
+
+  expect_failures = [var.target_alb_arn]
+}
+
 run "rejects_both_target_sets" {
   command = plan
 
@@ -170,6 +311,59 @@ run "rejects_no_target_set" {
   }
 
   expect_failures = [aws_vpc_endpoint_service.this]
+}
+
+# An existing load balancer publishes the service as it is. The target inputs
+# are only used to build the load balancer, target group and listener this
+# module creates, so alongside existing_nlb_arn they change nothing: a caller
+# that set them before the existing NLB path keeps the same plan. Only
+# target_alb_arn is rejected next to it, because an ALB target is the one kind
+# that would otherwise look applied while the existing load balancer forwards
+# to its own targets.
+run "existing_nlb_with_ips_still_plans" {
+  command = plan
+
+  module {
+    source = "./modules/private-link-service"
+  }
+
+  variables {
+    existing_nlb_arn = "arn:aws:elasticloadbalancing:eu-west-1:111111111111:loadbalancer/net/existing/0123456789abcdef"
+  }
+
+  assert {
+    condition     = length(aws_lb.this) == 0 && length(aws_lb_target_group.this) == 0 && length(aws_lb_target_group_attachment.this) == 0
+    error_message = "With an existing load balancer, the target IPs are ignored and no load balancer, target group or attachment is created."
+  }
+
+  assert {
+    condition     = aws_vpc_endpoint_service.this.network_load_balancer_arns == toset([var.existing_nlb_arn])
+    error_message = "The endpoint service publishes the existing load balancer, whatever target_ips holds."
+  }
+}
+
+run "existing_nlb_with_instance_ids_still_plans" {
+  command = plan
+
+  module {
+    source = "./modules/private-link-service"
+  }
+
+  variables {
+    target_ips          = []
+    target_instance_ids = ["i-0123456789abcdef0"]
+    existing_nlb_arn    = "arn:aws:elasticloadbalancing:eu-west-1:111111111111:loadbalancer/net/existing/0123456789abcdef"
+  }
+
+  assert {
+    condition     = length(aws_lb.this) == 0 && length(aws_security_group.this) == 0 && length(aws_lb_target_group.this) == 0
+    error_message = "With an existing load balancer, the target instance ids are ignored and no target resources are created."
+  }
+
+  assert {
+    condition     = aws_vpc_endpoint_service.this.network_load_balancer_arns == toset([var.existing_nlb_arn])
+    error_message = "The endpoint service publishes the existing load balancer, whatever target_instance_ids holds."
+  }
 }
 
 run "byo_nlb_skips_the_load_balancer" {
@@ -200,7 +394,7 @@ run "byo_nlb_skips_the_load_balancer" {
   }
 
   assert {
-    condition     = output.nlb_arn == var.existing_nlb_arn && output.nlb_security_group_id == null
+    condition     = output.nlb_arn == var.existing_nlb_arn && output.nlb_security_group_id == null && output.load_balancer_security_group_id == null
     error_message = "The outputs describe the supplied load balancer and no security group."
   }
 }
@@ -434,5 +628,61 @@ run "template_agrees_with_the_module" {
   assert {
     condition     = length(regexall("SupportedRegions", file("${path.cwd}/../cloudformation/templates/private-link-service.yaml"))) > 0
     error_message = "The template must enable the Neuralsec region when it differs."
+  }
+
+  assert {
+    condition     = length(regexall("Leave TargetAlbArn empty when ExistingNlbArn is set", file("${path.cwd}/../cloudformation/templates/private-link-service.yaml"))) == 1
+    error_message = "The template rejects only an ALB target next to ExistingNlbArn, as the module does; targets on an existing load balancer are ignored."
+  }
+}
+
+# Changing the target kind on a live link replaces the target group. The runs
+# below apply one kind after another on one state: each must apply, and the
+# listener must forward to the new group in the same apply. The generated name
+# is what lets AWS hold the old group and the new one at once; with a fixed name
+# the second create would be rejected.
+run "target_kind_change_to_alb_applies" {
+  command = apply
+
+  module {
+    source = "./modules/private-link-service"
+  }
+
+  variables {
+    target_ips     = []
+    target_alb_arn = "arn:aws:elasticloadbalancing:eu-west-1:111111111111:loadbalancer/app/registry/0123456789abcdef"
+  }
+
+  assert {
+    condition     = aws_lb_target_group.this[0].target_type == "alb" && length(aws_lb_target_group_attachment.this) == 1
+    error_message = "A link that published IP targets applies again with an ALB target."
+  }
+
+  assert {
+    condition     = aws_lb_listener.this[0].default_action[0].target_group_arn == aws_lb_target_group.this[0].arn
+    error_message = "The listener forwards to the new target group in the same apply, so the link keeps serving traffic."
+  }
+}
+
+run "target_kind_change_to_instances_applies" {
+  command = apply
+
+  module {
+    source = "./modules/private-link-service"
+  }
+
+  variables {
+    target_ips          = []
+    target_instance_ids = ["i-0123456789abcdef0"]
+  }
+
+  assert {
+    condition     = aws_lb_target_group.this[0].target_type == "instance" && length(aws_lb_target_group_attachment.this) == 1
+    error_message = "The same link applies again with an instance target."
+  }
+
+  assert {
+    condition     = aws_lb_listener.this[0].default_action[0].target_group_arn == aws_lb_target_group.this[0].arn
+    error_message = "The listener follows the target group through a second kind change."
   }
 }

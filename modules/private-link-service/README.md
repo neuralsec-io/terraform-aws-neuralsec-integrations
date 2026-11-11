@@ -16,8 +16,8 @@ release with `supported_regions` on `aws_vpc_endpoint_service`) and the
 | :--- | :--- |
 | `aws_lb` | internal Network Load Balancer in `subnet_ids`, with a dedicated security group |
 | `aws_security_group` | outbound traffic on the target port to the targets; no inbound rule |
-| `aws_lb_target_group` | TCP target group, `ip` for `target_ips`, `instance` for `target_instance_ids`, TCP health check on the target port |
-| `aws_lb_target_group_attachment` | one entry per target |
+| `aws_lb_target_group` | TCP target group, `alb` for `target_alb_arn`, `instance` for `target_instance_ids`, `ip` for `target_ips`; a TCP health check on the target port, or an HTTPS one on the ALB listener port for an ALB target |
+| `aws_lb_target_group_attachment` | one entry per target; the single ALB entry carries the load balancer ARN |
 | `aws_lb_listener` | TCP 443, forwarded to the target group |
 | `aws_vpc_endpoint_service` | endpoint service for the load balancer, `allowed_principals` exactly the Neuralsec role, no private DNS name |
 
@@ -35,11 +35,12 @@ load balancer, target group, listener and security group.
 | `neuralsec_region` | string | `eu-west-1` | Region Neuralsec runs in, left unset; listed next to the stack region when it differs |
 | `vpc_id` | string | required | VPC that holds the service |
 | `subnet_ids` | list(string) | required | at least two private subnets the load balancer uses |
-| `target_ips` | list(string) | `[]` | private IPv4 addresses of the service. Set exactly one of `target_ips` and `target_instance_ids` unless `existing_nlb_arn` is set |
-| `target_instance_ids` | list(string) | `[]` | instance ids of the service. Set exactly one of the two unless `existing_nlb_arn` is set |
-| `target_port` | number | `443` | TCP port of the targets. The listener stays on 443 |
+| `target_alb_arn` | string | `null` | ARN of an internal Application Load Balancer, the recommended target: it keeps a stable ARN while its addresses change. Set exactly one of `target_alb_arn`, `target_ips` and `target_instance_ids`, or `existing_nlb_arn` instead, which rejects an ALB target |
+| `target_ips` | list(string) | `[]` | private IPv4 addresses of the service. Set exactly one of `target_alb_arn`, `target_ips` and `target_instance_ids` unless `existing_nlb_arn` is set, which ignores them |
+| `target_instance_ids` | list(string) | `[]` | instance ids of the service. Set exactly one of the three unless `existing_nlb_arn` is set, which ignores them |
+| `target_port` | number | `443` | TCP port of the targets. The listener stays on 443. With `target_alb_arn` it must be the port of an ALB listener, so a health check reaches the ALB |
 | `acceptance_required` | bool | `false` | whether a connection request needs your acceptance |
-| `existing_nlb_arn` | string | `null` | ARN of an existing internal Network Load Balancer to publish |
+| `existing_nlb_arn` | string | `null` | ARN of an existing internal Network Load Balancer to publish; `target_ips` and `target_instance_ids` are ignored with it and an ALB target is rejected |
 | `tags` | map(string) | `{}` | additional tags for every resource |
 
 ## Outputs
@@ -50,6 +51,7 @@ load balancer, target group, listener and security group.
 | `endpoint_service_id` | endpoint service id |
 | `nlb_arn` | ARN of the load balancer that publishes the service |
 | `nlb_security_group_id` | security group to allow on the target port in the service security group; null with `existing_nlb_arn` |
+| `load_balancer_security_group_id` | the same security group under a target-neutral name: an Application Load Balancer target must allow it inbound on the target port; null with `existing_nlb_arn` |
 
 ## Tags
 
@@ -62,9 +64,11 @@ shipped in and is bumped with that release.
 
 ## The one manual step
 
-Allow the load balancer security group (`nlb_security_group_id`) on the target
-port in the security group of the service itself. The module cannot do it: that
-security group belongs to you, not to this module.
+Allow the load balancer security group (`nlb_security_group_id` or
+`load_balancer_security_group_id`) on the target port in the security group of
+the service itself. With `target_alb_arn`, also allow that group inbound on the
+target port in the security group of the Application Load Balancer. The module
+cannot do it: those security groups belong to you, not to this module.
 
 ## Cross-region
 
@@ -77,10 +81,33 @@ diff. The load balancer and the service stay in your region.
 
 ## Usage
 
+An internal Application Load Balancer is the recommended target: the load
+balancer keeps a stable ARN while its IP addresses change, and it can route on
+the hostname or path. The target port must be the port of an ALB listener.
+
 ```hcl
 module "neuralsec_private_link_service" {
   source  = "neuralsec-io/neuralsec-integrations/aws//modules/private-link-service"
-  version = "0.3.0"
+  version = "0.3.2"
+
+  name                    = "registry"
+  neuralsec_org_id        = "00000000-0000-4000-8000-000000000000"
+  neuralsec_org_slug      = "example"
+  neuralsec_principal_arn = "arn:aws:iam::111111111111:role/neuralsec-app"
+
+  vpc_id         = "vpc-0123456789abcdef0"
+  subnet_ids     = ["subnet-0123456789abcdef0", "subnet-0123456789abcdef1"]
+  target_alb_arn = "arn:aws:elasticloadbalancing:eu-west-1:111111111111:loadbalancer/app/registry/0123456789abcdef"
+}
+```
+
+Fixed IPs work the same way. Prefer the ALB when the service's addresses can
+change: a fixed IP that moves breaks the link silently.
+
+```hcl
+module "neuralsec_private_link_service" {
+  source  = "neuralsec-io/neuralsec-integrations/aws//modules/private-link-service"
+  version = "0.3.2"
 
   name                    = "registry"
   neuralsec_org_id        = "00000000-0000-4000-8000-000000000000"
@@ -96,10 +123,11 @@ module "neuralsec_private_link_service" {
 The CloudFormation template `private-link-service.yaml` mirrors the module. It
 takes the same values as parameters (`Name`, `NeuralsecOrgId`,
 `NeuralsecOrgSlug`, `CreatedAt`, `NeuralsecPrincipalArn`, `NeuralsecRegion`,
-`VpcId`, `SubnetIds`, `TargetIp`, `TargetInstanceId`, `TargetPort`,
-`AcceptanceRequired`, `ExistingNlbArn`). A stack registers one target, because
-CloudFormation cannot turn a parameter list into one target registration per
-address; use this module when the service sits behind several addresses.
+`VpcId`, `SubnetIds`, `TargetAlbArn`, `TargetIp`, `TargetInstanceId`,
+`TargetPort`, `AcceptanceRequired`, `ExistingNlbArn`). A stack registers one
+target, because CloudFormation cannot turn a parameter list into one target
+registration per address; use this module when the service sits behind several
+addresses.
 
 ## Tests
 

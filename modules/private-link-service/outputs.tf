@@ -17,3 +17,8 @@ output "nlb_security_group_id" {
   description = "ID of the load balancer security group. Allow it on the target port in the service security group. Null when existing_nlb_arn is set."
   value       = try(aws_security_group.this[0].id, null)
 }
+
+output "load_balancer_security_group_id" {
+  description = "ID of the load balancer security group, whichever target kind is set. Allow it on the target port inbound in the security group of an Application Load Balancer target. Null when existing_nlb_arn is set."
+  value       = try(aws_security_group.this[0].id, null)
+}
