@@ -103,8 +103,13 @@ run "ip_targets_publish_the_service" {
   }
 
   assert {
+    condition     = length(aws_lb_listener.http) == 0 && length(aws_lb_target_group.http) == 0 && length(aws_lb_target_group_attachment.http) == 0
+    error_message = "Plain HTTP is off by default: no port 80 listener, target group or attachment."
+  }
+
+  assert {
     condition     = aws_lb_listener.this[0].port == 443 && aws_lb_listener.this[0].protocol == "TCP"
-    error_message = "The listener stays on TCP 443: Neuralsec speaks HTTPS only."
+    error_message = "The 443 listener stays on TCP and is HTTPS; port 80 is an optional plain HTTP listener, off by default."
   }
 
   assert {
@@ -126,6 +131,122 @@ run "ip_targets_publish_the_service" {
     condition     = aws_vpc_endpoint_service.this.acceptance_required == false
     error_message = "Acceptance is automatic by default."
   }
+}
+
+run "http_target_port_adds_a_port_80_listener" {
+  command = plan
+
+  module {
+    source = "./modules/private-link-service"
+  }
+
+  variables {
+    http_target_port = 8080
+  }
+
+  assert {
+    condition     = aws_lb_listener.http[0].port == 80 && aws_lb_listener.http[0].protocol == "TCP"
+    error_message = "http_target_port adds a TCP 80 listener."
+  }
+
+  assert {
+    condition     = aws_lb_listener.this[0].port == 443 && aws_lb_target_group.this[0].port == 443
+    error_message = "The 443 listener and its target group are unchanged."
+  }
+
+  assert {
+    condition     = aws_lb_target_group.http[0].port == 8080 && aws_lb_target_group.http[0].target_type == "ip"
+    error_message = "The HTTP target group uses http_target_port and the same target kind."
+  }
+
+  assert {
+    condition     = aws_lb_target_group.http[0].health_check[0].protocol == "TCP" && aws_lb_target_group.http[0].health_check[0].port == "8080"
+    error_message = "The HTTP target group uses a TCP health check on its port."
+  }
+
+  assert {
+    condition     = length(aws_lb_target_group_attachment.http) == 2 && alltrue([for a in aws_lb_target_group_attachment.http : a.port == 8080])
+    error_message = "The HTTP target group registers the same targets as the 443 path, on http_target_port."
+  }
+
+  assert {
+    condition     = keys(aws_lb_listener.http[0].tags) == keys(aws_lb_listener.this[0].tags) && keys(aws_lb_target_group.http[0].tags) == keys(aws_lb_target_group.this[0].tags)
+    error_message = "The HTTP resources carry the same tags."
+  }
+
+  assert {
+    condition     = contains([for rule in aws_security_group.this[0].egress : rule.from_port], 8080) && contains([for rule in aws_security_group.this[0].egress : rule.from_port], 443)
+    error_message = "The security group also allows egress on http_target_port, next to the target port."
+  }
+}
+
+run "http_target_port_equal_to_target_port_adds_no_duplicate_rule" {
+  command = plan
+
+  module {
+    source = "./modules/private-link-service"
+  }
+
+  variables {
+    http_target_port = 443
+  }
+
+  assert {
+    condition     = length(aws_security_group.this[0].egress) == 2
+    error_message = "One egress rule per target IP even when both ports match."
+  }
+}
+
+run "http_target_port_with_an_alb_target_uses_an_http_health_check" {
+  command = plan
+
+  module {
+    source = "./modules/private-link-service"
+  }
+
+  variables {
+    target_ips       = []
+    target_alb_arn   = "arn:aws:elasticloadbalancing:eu-west-1:111111111111:loadbalancer/app/registry/0123456789abcdef"
+    http_target_port = 80
+  }
+
+  assert {
+    condition     = aws_lb_target_group.http[0].target_type == "alb" && aws_lb_target_group.http[0].health_check[0].protocol == "HTTP"
+    error_message = "An alb target group needs an HTTP health check."
+  }
+}
+
+run "http_target_port_is_ignored_with_an_existing_nlb" {
+  command = plan
+
+  module {
+    source = "./modules/private-link-service"
+  }
+
+  variables {
+    target_ips       = []
+    http_target_port = 8080
+    existing_nlb_arn = "arn:aws:elasticloadbalancing:eu-west-1:111111111111:loadbalancer/net/existing/0123456789abcdef"
+  }
+
+  assert {
+    condition     = length(aws_lb_listener.http) == 0 && length(aws_lb_target_group.http) == 0
+    error_message = "With an existing load balancer the customer adds the port 80 listener themselves."
+  }
+}
+
+run "rejects_an_http_target_port_out_of_range" {
+  command = plan
+
+  module {
+    source = "./modules/private-link-service"
+  }
+
+  variables {
+    http_target_port = 70000
+  }
+
+  expect_failures = [var.http_target_port]
 }
 
 run "instance_targets_use_the_vpc_cidr" {
@@ -633,6 +754,19 @@ run "template_agrees_with_the_module" {
   assert {
     condition     = length(regexall("Leave TargetAlbArn empty when ExistingNlbArn is set", file("${path.cwd}/../cloudformation/templates/private-link-service.yaml"))) == 1
     error_message = "The template rejects only an ALB target next to ExistingNlbArn, as the module does; targets on an existing load balancer are ignored."
+  }
+}
+
+run "template_has_the_optional_http_listener" {
+  command = plan
+
+  module {
+    source = "./modules/private-link-service"
+  }
+
+  assert {
+    condition     = length(regexall("HttpTargetPort:", file("${path.cwd}/../cloudformation/templates/private-link-service.yaml"))) == 1 && length(regexall("Port: 80\n", file("${path.cwd}/../cloudformation/templates/private-link-service.yaml"))) == 1
+    error_message = "The template exposes HttpTargetPort and one port 80 listener."
   }
 }
 

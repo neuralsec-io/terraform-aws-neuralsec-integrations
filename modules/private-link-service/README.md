@@ -18,11 +18,19 @@ release with `supported_regions` on `aws_vpc_endpoint_service`) and the
 | `aws_security_group` | outbound traffic on the target port to the targets; no inbound rule |
 | `aws_lb_target_group` | TCP target group, `alb` for `target_alb_arn`, `instance` for `target_instance_ids`, `ip` for `target_ips`; a TCP health check on the target port, or an HTTPS one on the ALB listener port for an ALB target |
 | `aws_lb_target_group_attachment` | one entry per target; the single ALB entry carries the load balancer ARN |
-| `aws_lb_listener` | TCP 443, forwarded to the target group |
+| `aws_lb_listener` | TCP 443, forwarded to the target group; with `http_target_port` also TCP 80, forwarded to a second target group (`http`) on that port with the same targets and a TCP health check (HTTP for an ALB target) |
 | `aws_vpc_endpoint_service` | endpoint service for the load balancer, `allowed_principals` exactly the Neuralsec role, no private DNS name |
 
 With `existing_nlb_arn` set, it creates only the endpoint service and skips the
-load balancer, target group, listener and security group.
+load balancer, target group, listener and security group. In that mode
+`http_target_port` has no effect: add the TCP 80 listener to your load balancer
+yourself.
+
+## Plain HTTP
+
+Set `http_target_port` to also accept plain HTTP on port 80. Plain HTTP is
+supported only through this private connection, on port 80. Prefer HTTPS. The
+443 listener is unchanged.
 
 ## Inputs
 
@@ -38,7 +46,8 @@ load balancer, target group, listener and security group.
 | `target_alb_arn` | string | `null` | ARN of an internal Application Load Balancer, the recommended target: it keeps a stable ARN while its addresses change. Set exactly one of `target_alb_arn`, `target_ips` and `target_instance_ids`, or `existing_nlb_arn` instead, which rejects an ALB target |
 | `target_ips` | list(string) | `[]` | private IPv4 addresses of the service. Set exactly one of `target_alb_arn`, `target_ips` and `target_instance_ids` unless `existing_nlb_arn` is set, which ignores them |
 | `target_instance_ids` | list(string) | `[]` | instance ids of the service. Set exactly one of the three unless `existing_nlb_arn` is set, which ignores them |
-| `target_port` | number | `443` | TCP port of the targets. The listener stays on 443. With `target_alb_arn` it must be the port of an ALB listener, so a health check reaches the ALB |
+| `target_port` | number | `443` | TCP port of the targets. The listener on 443 is HTTPS. With `target_alb_arn` it must be the port of an ALB listener, so a health check reaches the ALB |
+| `http_target_port` | number | `null` | optional TCP port of the targets for plain HTTP. When set, the load balancer also listens on TCP 80 and forwards to it. Plain HTTP is supported only through this private connection, on port 80. Prefer HTTPS. Ignored with `existing_nlb_arn` |
 | `acceptance_required` | bool | `false` | whether a connection request needs your acceptance |
 | `existing_nlb_arn` | string | `null` | ARN of an existing internal Network Load Balancer to publish; `target_ips` and `target_instance_ids` are ignored with it and an ALB target is rejected |
 | `tags` | map(string) | `{}` | additional tags for every resource |
@@ -124,7 +133,7 @@ The CloudFormation template `private-link-service.yaml` mirrors the module. It
 takes the same values as parameters (`Name`, `NeuralsecOrgId`,
 `NeuralsecOrgSlug`, `CreatedAt`, `NeuralsecPrincipalArn`, `NeuralsecRegion`,
 `VpcId`, `SubnetIds`, `TargetAlbArn`, `TargetIp`, `TargetInstanceId`,
-`TargetPort`, `AcceptanceRequired`, `ExistingNlbArn`). A stack registers one
+`TargetPort`, `HttpTargetPort`, `AcceptanceRequired`, `ExistingNlbArn`). A stack registers one
 target, because CloudFormation cannot turn a parameter list into one target
 registration per address; use this module when the service sits behind several
 addresses.

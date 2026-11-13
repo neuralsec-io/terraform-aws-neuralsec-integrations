@@ -103,13 +103,24 @@ variable "target_instance_ids" {
 }
 
 variable "target_port" {
-  description = "TCP port of the targets. The listener stays on 443, because Neuralsec connects over HTTPS only. With target_alb_arn it must be the port of an ALB listener, so a health check reaches the ALB; it defaults to 443, the HTTPS listener."
+  description = "TCP port of the targets. The listener on 443 is HTTPS. With target_alb_arn it must be the port of an ALB listener, so a health check reaches the ALB; it defaults to 443, the HTTPS listener."
   type        = number
   default     = 443
 
   validation {
     condition     = var.target_port >= 1 && var.target_port <= 65535
     error_message = "target_port must be a TCP port between 1 and 65535."
+  }
+}
+
+variable "http_target_port" {
+  description = "Optional. TCP port of the targets for plain HTTP. When set, the load balancer also listens on TCP 80 and forwards to a second target group on this port, with the same targets as the 443 path. Plain HTTP is supported only through this private connection, on port 80. Prefer HTTPS. Null disables it. With existing_nlb_arn it is ignored: add the port 80 listener to your load balancer yourself."
+  type        = number
+  default     = null
+
+  validation {
+    condition     = coalesce(var.http_target_port, 80) >= 1 && coalesce(var.http_target_port, 80) <= 65535
+    error_message = "http_target_port must be a TCP port between 1 and 65535, or null."
   }
 }
 

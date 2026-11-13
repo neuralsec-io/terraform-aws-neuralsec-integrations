@@ -54,7 +54,7 @@ locals {
     ] : is_set if is_set
   ])
 
-  # The load balancer accepts connections only on 443, so its egress is scoped
+  # The load balancer accepts connections only on 443 (and 80 when http_target_port is set), so its egress is scoped
   # to the targets on the target port. Instance targets and an ALB can move
   # within the VPC, so their rule covers the VPC CIDR; fixed IPs are named one
   # by one.
@@ -68,6 +68,23 @@ locals {
   # not from an address the customer can name, so the module turns the inbound
   # rule enforcement off and needs no ingress rule.
   cross_region = var.neuralsec_region != data.aws_region.current.name
+
+  # Optional plain HTTP: a second listener on 80 and its own target group on
+  # http_target_port, only on the load balancer this module creates.
+  http_enabled = local.create_nlb && var.http_target_port != null
+
+  # Egress ports of the load balancer security group: the target port, plus the
+  # HTTP target port when enabled and different (a duplicate rule is refused).
+  egress_ports = toset(concat(
+    [var.target_port],
+    local.http_enabled ? [var.http_target_port] : [],
+  ))
+
+  # One egress rule per port and target address.
+  egress_rules = {
+    for pair in setproduct(local.egress_ports, toset(local.egress_cidrs)) :
+    "${pair[0]}-${pair[1]}" => { port = pair[0], cidr = pair[1] }
+  }
 
   # A supplied load balancer wins; otherwise the one this module creates.
   nlb_arn = one(concat(
@@ -111,13 +128,13 @@ resource "aws_security_group" "this" {
   vpc_id      = var.vpc_id
 
   dynamic "egress" {
-    for_each = local.create_nlb ? toset(local.egress_cidrs) : toset([])
+    for_each = local.create_nlb ? local.egress_rules : {}
 
     content {
-      from_port   = var.target_port
-      to_port     = var.target_port
+      from_port   = egress.value.port
+      to_port     = egress.value.port
       protocol    = "tcp"
-      cidr_blocks = [egress.value]
+      cidr_blocks = [egress.value.cidr]
       description = "Neuralsec private link to the service on the target port"
     }
   }
@@ -175,6 +192,68 @@ resource "aws_lb_target_group_attachment" "this" {
   target_group_arn = aws_lb_target_group.this[0].arn
   target_id        = local.targets[count.index]
   port             = var.target_port
+}
+
+# Optional plain HTTP, off by default: same target kind and registration as the
+# 443 path, on http_target_port. An ALB target needs an HTTP health check, as
+# above; every other kind uses TCP.
+resource "aws_lb_target_group" "http" {
+  count = local.http_enabled ? 1 : 0
+
+  name_prefix = "nsph-"
+  port        = var.http_target_port
+  protocol    = "TCP"
+  target_type = local.target_type
+  vpc_id      = var.vpc_id
+
+  lifecycle {
+    create_before_destroy = true
+  }
+
+  dynamic "health_check" {
+    for_each = local.target_type == "alb" ? [1] : []
+
+    content {
+      protocol = "HTTP"
+      port     = var.http_target_port
+      path     = "/"
+      matcher  = "200-499"
+    }
+  }
+
+  dynamic "health_check" {
+    for_each = local.target_type == "alb" ? [] : [1]
+
+    content {
+      protocol = "TCP"
+      port     = var.http_target_port
+    }
+  }
+
+  tags = local.tags
+}
+
+resource "aws_lb_target_group_attachment" "http" {
+  count = local.http_enabled ? length(local.targets) : 0
+
+  target_group_arn = aws_lb_target_group.http[0].arn
+  target_id        = local.targets[count.index]
+  port             = var.http_target_port
+}
+
+resource "aws_lb_listener" "http" {
+  count = local.http_enabled ? 1 : 0
+
+  load_balancer_arn = aws_lb.this[0].arn
+  port              = 80
+  protocol          = "TCP"
+
+  default_action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.http[0].arn
+  }
+
+  tags = local.tags
 }
 
 resource "aws_lb_listener" "this" {
