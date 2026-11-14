@@ -48,7 +48,7 @@ supported only through this private connection, on port 80. Prefer HTTPS. The
 | `target_instance_ids` | list(string) | `[]` | instance ids of the service. Set exactly one of the three unless `existing_nlb_arn` is set, which ignores them |
 | `target_port` | number | `443` | TCP port of the targets. The listener on 443 is HTTPS. With `target_alb_arn` it must be the port of an ALB listener, so a health check reaches the ALB |
 | `http_target_port` | number | `null` | optional TCP port of the targets for plain HTTP. When set, the load balancer also listens on TCP 80 and forwards to it. Plain HTTP is supported only through this private connection, on port 80. Prefer HTTPS. Ignored with `existing_nlb_arn` |
-| `acceptance_required` | bool | `false` | whether a connection request needs your acceptance |
+| `acceptance_required` | bool | `true` | whether a connection request needs your acceptance, so you can confirm the request's endpoint ID matches the one shown in the Neuralsec app for this connection. Set `false` only if you accept that any Neuralsec connection using this service name is accepted automatically |
 | `existing_nlb_arn` | string | `null` | ARN of an existing internal Network Load Balancer to publish; `target_ips` and `target_instance_ids` are ignored with it and an ALB target is rejected |
 | `tags` | map(string) | `{}` | additional tags for every resource |
 
@@ -79,6 +79,15 @@ the service itself. With `target_alb_arn`, also allow that group inbound on the
 target port in the security group of the Application Load Balancer. The module
 cannot do it: those security groups belong to you, not to this module.
 
+## Accept the connection
+
+With the default `acceptance_required = true`, Neuralsec's connection request
+waits for you. After you paste the service name into Neuralsec, the app shows
+the endpoint ID of the request for this connection. In the VPC console, open
+Endpoint services, select the service, then Endpoint connections, and accept
+only the request whose endpoint ID matches the one in the app. Reject any other
+request.
+
 ## Cross-region
 
 Neuralsec runs in `eu-west-1`, which is the default of `neuralsec_region`: leave
@@ -102,7 +111,7 @@ module "neuralsec_private_link_service" {
   name                    = "registry"
   neuralsec_org_id        = "00000000-0000-4000-8000-000000000000"
   neuralsec_org_slug      = "example"
-  neuralsec_principal_arn = "arn:aws:iam::111111111111:role/neuralsec-app"
+  neuralsec_principal_arn = "arn:aws:iam::111111111111:role/neuralsec-privatelink"
 
   vpc_id         = "vpc-0123456789abcdef0"
   subnet_ids     = ["subnet-0123456789abcdef0", "subnet-0123456789abcdef1"]
@@ -121,7 +130,7 @@ module "neuralsec_private_link_service" {
   name                    = "registry"
   neuralsec_org_id        = "00000000-0000-4000-8000-000000000000"
   neuralsec_org_slug      = "example"
-  neuralsec_principal_arn = "arn:aws:iam::111111111111:role/neuralsec-app"
+  neuralsec_principal_arn = "arn:aws:iam::111111111111:role/neuralsec-privatelink"
 
   vpc_id     = "vpc-0123456789abcdef0"
   subnet_ids = ["subnet-0123456789abcdef0", "subnet-0123456789abcdef1"]

@@ -125,9 +125,9 @@ variable "http_target_port" {
 }
 
 variable "acceptance_required" {
-  description = "Whether a connection request to the endpoint service needs your acceptance. The allowed principal already limits the consumers to Neuralsec, so the default accepts automatically."
+  description = "Whether a connection request to the endpoint service needs your acceptance. With true, the default, you accept a request only after confirming that its endpoint ID matches the one shown in the Neuralsec app for this connection. Set false only if you accept that any Neuralsec connection using this service name is accepted automatically."
   type        = bool
-  default     = false
+  default     = true
 }
 
 variable "existing_nlb_arn" {

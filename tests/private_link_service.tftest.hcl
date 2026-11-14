@@ -66,7 +66,7 @@ variables {
   name                    = "registry"
   neuralsec_org_id        = "00000000-0000-4000-8000-000000000000"
   neuralsec_org_slug      = "example"
-  neuralsec_principal_arn = "arn:aws:iam::111111111111:role/neuralsec-app"
+  neuralsec_principal_arn = "arn:aws:iam::111111111111:role/neuralsec-privatelink"
   vpc_id                  = "vpc-0123456789abcdef0"
   subnet_ids = [
     "subnet-0123456789abcdef0",
@@ -128,8 +128,8 @@ run "ip_targets_publish_the_service" {
   }
 
   assert {
-    condition     = aws_vpc_endpoint_service.this.acceptance_required == false
-    error_message = "Acceptance is automatic by default."
+    condition     = aws_vpc_endpoint_service.this.acceptance_required == true
+    error_message = "Acceptance is required by default."
   }
 }
 
