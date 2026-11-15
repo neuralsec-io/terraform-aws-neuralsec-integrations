@@ -1,9 +1,10 @@
 {
-  "version": "ff468e0e",
+  "version": "a18e54da",
   "account": [
     "access-analyzer:GetAnalyzer",
     "access-analyzer:ListAnalyzers",
     "access-analyzer:ListArchiveRules",
+    "acm-pca:ListCertificateAuthorities",
     "acm:DescribeCertificate",
     "acm:ListCertificates",
     "acm:ListTagsForCertificate",
@@ -419,6 +420,7 @@
     "rds:DescribeDBClusterSnapshotAttributes",
     "rds:DescribeDBClusterSnapshots",
     "rds:DescribeDBClusters",
+    "rds:DescribeDBEngineVersions",
     "rds:DescribeDBInstances",
     "rds:DescribeDBParameterGroups",
     "rds:DescribeDBParameters",
@@ -548,6 +550,7 @@
     "ssm:DescribeParameters",
     "ssm:ListAssociations",
     "ssm:ListDocuments",
+    "ssm:ListResourceComplianceSummaries",
     "states:DescribeStateMachine",
     "states:ListStateMachines",
     "states:ListTagsForResource",
