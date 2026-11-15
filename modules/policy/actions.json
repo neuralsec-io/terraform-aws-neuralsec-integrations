@@ -1,5 +1,5 @@
 {
-  "version": "7299abc3",
+  "version": "ff468e0e",
   "account": [
     "access-analyzer:GetAnalyzer",
     "access-analyzer:ListAnalyzers",
@@ -394,6 +394,7 @@
     "macie2:GetAutomatedDiscoveryConfiguration",
     "macie2:GetMacieSession",
     "memorydb:DescribeClusters",
+    "memorydb:DescribeSubnetGroups",
     "memorydb:ListTags",
     "mq:DescribeBroker",
     "mq:DescribeSharedResources",
