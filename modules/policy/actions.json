@@ -1,5 +1,5 @@
 {
-  "version": "a18e54da",
+  "version": "65a852ed",
   "account": [
     "access-analyzer:GetAnalyzer",
     "access-analyzer:ListAnalyzers",
@@ -100,6 +100,8 @@
     "codeartifact:GetDomainPermissionsPolicy",
     "codeartifact:GetRepositoryPermissionsPolicy",
     "codeartifact:ListDomains",
+    "codeartifact:ListPackageVersions",
+    "codeartifact:ListPackages",
     "codeartifact:ListRepositories",
     "codeartifact:ListTagsForResource",
     "codebuild:BatchGetProjects",
