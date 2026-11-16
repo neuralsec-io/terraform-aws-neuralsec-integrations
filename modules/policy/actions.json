@@ -1,5 +1,5 @@
 {
-  "version": "65a852ed",
+  "version": "5f5dd5ce",
   "account": [
     "access-analyzer:GetAnalyzer",
     "access-analyzer:ListAnalyzers",
@@ -297,6 +297,7 @@
     "firehose:DescribeDeliveryStream",
     "firehose:ListDeliveryStreams",
     "firehose:ListTagsForDeliveryStream",
+    "fsx:DescribeFileSystems",
     "glacier:GetVaultAccessPolicy",
     "glacier:GetVaultLock",
     "glacier:ListTagsForVault",
