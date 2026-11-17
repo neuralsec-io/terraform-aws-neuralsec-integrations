@@ -7,7 +7,7 @@ Terraform modules for installing Neuralsec into an AWS account or an AWS Organiz
 | Name | Version |
 | :--- | :--- |
 | Terraform | >= 1.4 |
-| OpenTofu | >= 1.6 |
+| OpenTofu | >= 1.6, and >= 1.9 for the `org-rollout` OpenTofu path |
 | AWS provider | >= 5.34 for `cloud-scanner-role` (EKS access entries), >= 4.0 for the other modules |
 
 `sensor-lambda` needs Terraform >= 1.6 or OpenTofu >= 1.6, and AWS provider
@@ -22,10 +22,10 @@ There is no upper bound. Each module declares its own requirement and
 
 | Module | What it creates |
 | :--- | :--- |
-| `modules/cloud-scanner-role` | read-only role per customer account, trusted only by the Neuralsec broker with the ExternalId of the connection; for EKS it also ships a read-only RBAC ClusterRole manifest to apply per cluster, and the `state_locations` input scopes the one object read the scanner is allowed (Terraform and Pulumi state under a registered bucket prefix) |
+| `modules/cloud-scanner-role` | read-only role per customer account, trusted only by the Neuralsec broker with the ExternalId of the connection; for EKS it also ships the list-only ClusterRole manifest to apply per cluster, and the `state_locations` input scopes the one object read the scanner is allowed (Terraform and Pulumi state under a registered bucket prefix) |
 | `modules/cloud-scanner-org` | read-only role for the management or delegated administrator account, with the `organizations` read actions |
 | `modules/cloud-scanner-org/org-rollout` | `cloud-scanner-role` in every active account of an organization, for OpenTofu or plain Terraform |
-| `modules/policy` | the action list export and the chunker that splits it across managed policies |
+| `modules/policy` | the action list export and the chunker that splits it across managed policies by service |
 | `modules/sensor-lambda` | no resources: the Neuralsec sensor layer ARN and the environment merged into a customer Lambda function (wrapper or preload mode) |
 | `modules/sensor-ecs-sidecar` | no resources: an ECS task definition rewritten with the Neuralsec sensor init and sidecar containers, the shared volumes and the PID mode |
 | `modules/sensor-eks` | a Helm release of the Neuralsec sensor chart, which runs the DaemonSet on every Linux node of the cluster |

@@ -218,8 +218,36 @@ run "eks_clusters_get_a_view_only_access_entry" {
   }
 
   assert {
-    condition     = aws_eks_access_policy_association.this["ns-e2e-cluster"].access_scope[0].type == "cluster"
-    error_message = "The view policy must be scoped to the whole cluster and nothing wider."
+    condition     = aws_eks_access_policy_association.this["ns-e2e-cluster"].access_scope[0].type == "cluster" && aws_eks_access_policy_association.this["ns-e2e-cluster"].policy_arn == "arn:aws:eks::aws:cluster-access-policy/AmazonEKSViewPolicy"
+    error_message = "For this release the view policy stays associated by default, scoped to the cluster, so clusters without the ClusterRole keep their inventory."
+  }
+
+  assert {
+    condition     = output.eks_upgrade_notice != ""
+    error_message = "While the broader policy is associated the module must say how to move to the list-only ClusterRole."
+  }
+}
+
+run "list_only_access_drops_the_view_policy" {
+  command = plan
+
+  module {
+    source = "./modules/cloud-scanner-role"
+  }
+
+  variables {
+    eks_clusters                = ["ns-e2e-cluster"]
+    eks_view_policy_association = false
+  }
+
+  assert {
+    condition     = length(aws_eks_access_policy_association.this) == 0 && length(aws_eks_access_entry.this) == 1
+    error_message = "With eks_view_policy_association = false only the access entry remains: the ClusterRole is the whole Kubernetes grant."
+  }
+
+  assert {
+    condition     = output.eks_upgrade_notice == ""
+    error_message = "No upgrade notice once the list-only access is in place."
   }
 }
 
@@ -231,7 +259,7 @@ run "synthetic_action_list_is_split_across_several_policies" {
   }
 
   variables {
-    actions = [for i in range(300) : "syntheticservice:ListSomethingWithAVeryLongName${i}"]
+    actions = [for i in range(300) : "synthetic${i % 30}:ListSomethingWithAVeryLongName${i}"]
   }
 
   assert {
@@ -252,7 +280,7 @@ run "synthetic_action_list_is_split_across_several_policies" {
   assert {
     condition = sort(distinct(flatten([
       for doc in output.documents : jsondecode(doc).Statement[0].Action
-    ]))) == sort(distinct([for i in range(300) : "syntheticservice:ListSomethingWithAVeryLongName${i}"]))
+    ]))) == sort(distinct([for i in range(300) : "synthetic${i % 30}:ListSomethingWithAVeryLongName${i}"]))
     error_message = "Chunking must not drop, duplicate or reorder actions."
   }
 }
@@ -269,7 +297,7 @@ run "named_read_exceptions_are_accepted" {
   }
 
   assert {
-    condition     = output.chunk_count == 1
+    condition     = length(flatten([for doc in output.documents : jsondecode(doc).Statement[0].Action])) == 3
     error_message = "The named read exceptions must pass validation."
   }
 }
@@ -299,7 +327,7 @@ run "rejects_the_lambda_layer_content_read" {
     actions = ["iam:ListRoles", "lambda:GetLayerVersion"]
   }
 
-  expect_failures = [var.actions]
+  expect_failures = [output.documents]
 }
 
 run "rejects_a_credential_vending_action" {
@@ -313,7 +341,7 @@ run "rejects_a_credential_vending_action" {
     actions = ["iam:ListRoles", "sts:GetSessionToken"]
   }
 
-  expect_failures = [var.actions]
+  expect_failures = [output.documents]
 }
 
 run "rejects_a_credential_vending_action_in_any_case" {
@@ -341,7 +369,7 @@ run "rejects_a_name_matching_the_credentials_pattern" {
     actions = ["iam:ListRoles", "newservice:GetThingCredentials"]
   }
 
-  expect_failures = [var.actions]
+  expect_failures = [output.documents]
 }
 
 run "rejects_a_name_matching_the_password_pattern_in_any_case" {
@@ -369,7 +397,7 @@ run "rejects_a_name_matching_the_get_object_suffix" {
     actions = ["iam:ListRoles", "newservice:GetObject"]
   }
 
-  expect_failures = [var.actions]
+  expect_failures = [output.documents]
 }
 
 run "rejects_a_name_matching_the_query_results_suffix" {
@@ -383,7 +411,7 @@ run "rejects_a_name_matching_the_query_results_suffix" {
     actions = ["iam:ListRoles", "newservice:GetBigQueryResults"]
   }
 
-  expect_failures = [var.actions]
+  expect_failures = [output.documents]
 }
 
 run "rejects_a_name_matching_the_get_records_suffix" {
@@ -397,7 +425,7 @@ run "rejects_a_name_matching_the_get_records_suffix" {
     actions = ["iam:ListRoles", "newservice:GetRecords"]
   }
 
-  expect_failures = [var.actions]
+  expect_failures = [output.documents]
 }
 
 run "rejects_the_ecr_authorization_token" {
@@ -411,7 +439,7 @@ run "rejects_the_ecr_authorization_token" {
     actions = ["iam:ListRoles", "ecr:GetAuthorizationToken"]
   }
 
-  expect_failures = [var.actions]
+  expect_failures = [output.documents]
 }
 
 run "rejects_a_dynamodb_item_read" {
@@ -425,7 +453,7 @@ run "rejects_a_dynamodb_item_read" {
     actions = ["iam:ListRoles", "dynamodb:BatchGetItem"]
   }
 
-  expect_failures = [var.actions]
+  expect_failures = [output.documents]
 }
 
 run "pattern_exceptions_stay_allowed" {
@@ -475,10 +503,6 @@ run "eks_access_entry_carries_the_rbac_group" {
     error_message = "The EKS access entry must place the role in the neuralsec:scanner-rbac-view group."
   }
 
-  assert {
-    condition     = aws_eks_access_policy_association.this["example"].policy_arn == "arn:aws:eks::aws:cluster-access-policy/AmazonEKSViewPolicy"
-    error_message = "The EKS view policy association must stay AmazonEKSViewPolicy, never the admin view policy."
-  }
 }
 
 # Customers that restrict the EKS public endpoint need the addresses the
@@ -554,7 +578,7 @@ run "scanner_egress_cidrs_combine_both_families_ipv6_first" {
   }
 }
 
-run "rbac_manifest_is_read_only_rbac_only" {
+run "rbac_manifest_is_list_only_on_the_scanned_resources" {
   command = plan
 
   module {
@@ -572,15 +596,32 @@ run "rbac_manifest_is_read_only_rbac_only" {
 
   assert {
     condition = alltrue([
-      for word in ["secrets", "configmaps", "\"*\""] :
+      for word in ["secrets", "configmaps", "pods/log", "\"*\"", "get", "watch"] :
       !strcontains(join("\n", [for l in split("\n", file(output.eks_rbac_manifest_path)) : l if !startswith(trimspace(l), "#")]), word)
     ])
-    error_message = "The manifest must not grant secrets, configmaps or wildcards."
+    error_message = "The manifest must not grant secrets, configmaps, pod logs, wildcards or any verb but list."
   }
 
   assert {
-    condition     = strcontains(file(output.eks_rbac_manifest_path), "verbs: [\"list\"]") && length(regexall("verbs:", file(output.eks_rbac_manifest_path))) == 1
-    error_message = "The manifest must only grant list, in its single rule."
+    condition = (
+      length(regexall("verbs:", file(output.eks_rbac_manifest_path))) == 5 &&
+      length(regexall("verbs: \\[\"list\"\\]", file(output.eks_rbac_manifest_path))) == 5
+    )
+    error_message = "Every rule of the manifest must grant list only."
+  }
+
+  # The exact resource set the scanner lists, by API group.
+  assert {
+    condition = alltrue([
+      for word in [
+        "resources: [\"deployments\", \"statefulsets\", \"daemonsets\"]",
+        "resources: [\"cronjobs\"]",
+        "resources: [\"pods\", \"services\", \"serviceaccounts\"]",
+        "resources: [\"ingresses\"]",
+        "resources: [\"roles\", \"clusterroles\", \"rolebindings\", \"clusterrolebindings\"]",
+      ] : strcontains(file(output.eks_rbac_manifest_path), word)
+    ])
+    error_message = "The manifest must list exactly the workload, networking and RBAC resources the scanner reads."
   }
 }
 
@@ -596,13 +637,13 @@ run "first_policy_description_is_stable_across_chunk_counts" {
   }
 
   assert {
-    condition     = aws_iam_policy.read[0].description == "Neuralsec cloud scanner read actions, part 1 of 1."
+    condition     = aws_iam_policy.read["1"].description == "Neuralsec cloud scanner read actions, part 1 of 1."
     error_message = "The first read policy must keep its released description, or upgrades replace it."
   }
 
   assert {
     condition = alltrue([
-      for i, p in aws_iam_policy.read : i == 0 || p.description == "Neuralsec cloud scanner read actions, part ${i + 1}."
+      for k, p in aws_iam_policy.read : k == "1" || p.description == "Neuralsec cloud scanner read actions, part ${k}."
     ])
     error_message = "Later read policies must not name the chunk total."
   }
@@ -693,7 +734,7 @@ run "state_locations_grant_exactly_the_registered_prefixes" {
 
   assert {
     condition = sort(flatten([
-      for s in jsondecode(output.iac_state_policy_document).Statement : s.Resource if s.Sid == "IacStateGetRegisteredObjects"
+      for s in jsondecode(output.iac_state_policy_document).Statement : s.Resource if startswith(s.Sid, "IacStateGetRegisteredObjects")
       ])) == sort([
       "arn:aws:s3:::example-pulumi-state/.pulumi/stacks/*",
       "arn:aws:s3:::example-tf-state/prod/*",
@@ -729,12 +770,30 @@ run "state_locations_grant_exactly_the_registered_prefixes" {
 
   assert {
     condition = flatten([
-      for s in jsondecode(output.iac_state_policy_document).Statement : concat(s.Resource, flatten(s.Condition.StringEquals["kms:ViaService"])) if s.Sid == "IacStateDecryptRegisteredKeys"
+      for s in jsondecode(output.iac_state_policy_document).Statement : concat(s.Resource, flatten(s.Condition.StringEquals["kms:ViaService"])) if startswith(s.Sid, "IacStateDecryptRegisteredKeys")
       ]) == [
       "arn:aws:kms:eu-west-1:111111111111:key/1234abcd-12ab-34cd-56ef-1234567890ab",
       "s3.eu-west-1.amazonaws.com",
     ]
     error_message = "kms:Decrypt must be scoped to the registered key and the S3 service of its region."
+  }
+
+  assert {
+    condition = flatten([
+      for s in jsondecode(output.iac_state_policy_document).Statement : s.Condition.StringLike["kms:EncryptionContext:aws:s3:arn"] if startswith(s.Sid, "IacStateDecryptRegisteredKeys")
+      ]) == [
+      "arn:aws:s3:::example-tf-state",
+      "arn:aws:s3:::example-tf-state/prod/*",
+    ]
+    error_message = "kms:Decrypt must be tied to the registered bucket and prefix by encryption context."
+  }
+
+  assert {
+    condition = alltrue([
+      for s in jsondecode(output.iac_state_policy_document).Statement :
+      !contains(s.Action, "kms:Decrypt") ? s.Condition.StringEquals["aws:ResourceAccount"] == ["111111111111"] : true
+    ])
+    error_message = "Every S3 grant must be pinned to the bucket owner account, by default the account of the role."
   }
 
   assert {
@@ -800,6 +859,156 @@ run "rejects_a_malformed_state_bucket" {
 
   variables {
     state_locations = [{ bucket = "Example_Bucket", prefix = "prod/" }]
+  }
+
+  expect_failures = [var.state_locations]
+}
+
+run "bucket_owner_pins_the_account_per_bucket" {
+  command = plan
+
+  module {
+    source = "./modules/cloud-scanner-role"
+  }
+
+  variables {
+    state_locations = [
+      { bucket = "example-central-state", prefix = "prod/", bucket_owner = "222222222222" },
+      { bucket = "example-local-state", prefix = "prod/" },
+    ]
+  }
+
+  assert {
+    condition = join(",", sort([
+      for s in jsondecode(output.iac_state_policy_document).Statement : "${s.Resource[0]}=${s.Condition.StringEquals["aws:ResourceAccount"][0]}"
+      if startswith(s.Sid, "IacStateGetRegisteredObjects")
+    ])) == "arn:aws:s3:::example-central-state/prod/*=222222222222,arn:aws:s3:::example-local-state/prod/*=111111111111"
+    error_message = "Each object grant must be pinned to the owner of its bucket."
+  }
+}
+
+run "exact_state_key_is_granted_without_a_wildcard" {
+  command = plan
+
+  module {
+    source = "./modules/cloud-scanner-role"
+  }
+
+  variables {
+    state_locations = [{ bucket = "example-state", prefix = "prod/network.tfstate" }]
+  }
+
+  assert {
+    condition = flatten([
+      for s in jsondecode(output.iac_state_policy_document).Statement : s.Resource if startswith(s.Sid, "IacStateGetRegisteredObjects")
+    ]) == ["arn:aws:s3:::example-state/prod/network.tfstate"]
+    error_message = "An exact .tfstate key must be granted as that one object."
+  }
+}
+
+run "whole_bucket_is_an_explicit_opt_in" {
+  command = plan
+
+  module {
+    source = "./modules/cloud-scanner-role"
+  }
+
+  variables {
+    state_locations = [{ bucket = "example-state", whole_bucket = true }]
+  }
+
+  assert {
+    condition = flatten([
+      for s in jsondecode(output.iac_state_policy_document).Statement : s.Resource if startswith(s.Sid, "IacStateGetRegisteredObjects")
+    ]) == ["arn:aws:s3:::example-state/*"]
+    error_message = "whole_bucket must grant every object of the bucket."
+  }
+}
+
+run "rejects_an_empty_state_prefix_without_whole_bucket" {
+  command = plan
+
+  module {
+    source = "./modules/cloud-scanner-role"
+  }
+
+  variables {
+    state_locations = [{ bucket = "example-state" }]
+  }
+
+  expect_failures = [var.state_locations]
+}
+
+run "rejects_a_state_prefix_that_is_neither_a_folder_nor_a_tfstate_key" {
+  command = plan
+
+  module {
+    source = "./modules/cloud-scanner-role"
+  }
+
+  variables {
+    state_locations = [{ bucket = "example-state", prefix = "prod" }]
+  }
+
+  expect_failures = [var.state_locations]
+}
+
+run "pulumi_exact_json_key_is_granted_and_terraform_json_is_not" {
+  command = plan
+
+  module {
+    source = "./modules/cloud-scanner-role"
+  }
+
+  variables {
+    state_locations = [{ bucket = "example-state", prefix = ".pulumi/stacks/example/prod.json", tool = "pulumi" }]
+  }
+
+  assert {
+    condition = flatten([
+      for s in jsondecode(output.iac_state_policy_document).Statement : s.Resource if startswith(s.Sid, "IacStateGetRegisteredObjects")
+    ]) == ["arn:aws:s3:::example-state/.pulumi/stacks/example/prod.json"]
+    error_message = "A pulumi exact .json key must be granted as that one object."
+  }
+}
+
+run "rejects_a_json_key_for_terraform" {
+  command = plan
+
+  module {
+    source = "./modules/cloud-scanner-role"
+  }
+
+  variables {
+    state_locations = [{ bucket = "example-state", prefix = "prod/network.json" }]
+  }
+
+  expect_failures = [var.state_locations]
+}
+
+run "rejects_whole_bucket_with_a_prefix" {
+  command = plan
+
+  module {
+    source = "./modules/cloud-scanner-role"
+  }
+
+  variables {
+    state_locations = [{ bucket = "example-state", prefix = "prod/", whole_bucket = true }]
+  }
+
+  expect_failures = [var.state_locations]
+}
+
+run "rejects_a_malformed_bucket_owner" {
+  command = plan
+
+  module {
+    source = "./modules/cloud-scanner-role"
+  }
+
+  variables {
+    state_locations = [{ bucket = "example-state", prefix = "prod/", bucket_owner = "abc" }]
   }
 
   expect_failures = [var.state_locations]
@@ -942,4 +1151,141 @@ run "one_list_statement_per_bucket" {
     ])) == sort(["prod/", "prod/*", "staging/", "staging/*"])
     error_message = "A bucket's statement must carry only that bucket's prefixes."
   }
+}
+
+# Actions are grouped by service, so one added action changes one policy and
+# leaves the others byte for byte as they were.
+run "adding_one_action_changes_one_policy" {
+  command = plan
+
+  module {
+    source = "./tests/fixtures/chunk-pair"
+  }
+
+  assert {
+    condition     = length(output.plus_one) == length(output.base)
+    error_message = "One added action must not change the number of policies."
+  }
+
+  assert {
+    condition     = length([for i, doc in output.plus_one : doc if doc != output.base[i]]) == 1
+    error_message = "One added action must change exactly one policy document."
+  }
+
+  assert {
+    condition     = output.reversed == output.base
+    error_message = "The policies must not depend on the order of the input list."
+  }
+}
+
+run "a_service_over_the_budget_fails_the_plan" {
+  command = plan
+
+  module {
+    source = "./modules/policy"
+  }
+
+  variables {
+    actions = [for i in range(300) : "oneservice:ListSomethingWithAVeryLongName${i}"]
+  }
+
+  expect_failures = [output.documents]
+}
+
+# The service buckets are shared with tools/cfngen, which pins the same hash
+# values, so the CloudFormation templates and this module cut identical
+# policies. The published list needs six read policies in both.
+run "service_hash_and_published_chunks_match_cfngen" {
+  command = plan
+
+  module {
+    source = "./modules/cloud-scanner-role"
+  }
+
+  assert {
+    condition = alltrue([
+      length(output.policy_documents) > 0,
+      parseint(substr(md5("iam"), 0, 8), 16) == 247224330,
+      parseint(substr(md5("ec2"), 0, 8), 16) == 3632470495,
+      parseint(substr(md5("s3"), 0, 8), 16) == 3229781507,
+      parseint(substr(md5("lambda"), 0, 8), 16) == 2489270212,
+    ])
+    error_message = "The service hash must equal the value pinned in tools/cfngen."
+  }
+
+  assert {
+    condition     = output.policy_chunk_count == 6
+    error_message = "The published action list must produce the same six read policies as the CloudFormation template."
+  }
+
+  assert {
+    condition     = length(aws_iam_policy.read) + 1 + 1 <= 10
+    error_message = "Attached read policies plus the deny and IaC state policies must fit the 10 policy cap."
+  }
+}
+
+# A service whose home bucket would pass the byte budget moves to the next
+# bucket, and the plan stays inside 6 policies. The same list and the same
+# counts per policy are pinned in tools/cfngen.
+run "an_overflowing_bucket_spills_to_the_next_one" {
+  command = plan
+
+  module {
+    source = "./modules/policy"
+  }
+
+  variables {
+    actions          = flatten([for s in range(10) : [for i in range(10) : "ovf${s}:DescribeSomethingLongEnough${i}"]])
+    max_policy_bytes = 1000
+  }
+
+  assert {
+    condition     = output.chunk_numbers == [1, 2, 3, 4, 5, 6] && [for doc in output.documents : length(jsondecode(doc).Statement[0].Action)] == [20, 20, 10, 10, 20, 20]
+    error_message = "The overflowing bucket must move one service to the next bucket, as tools/cfngen does."
+  }
+
+  assert {
+    condition     = length(flatten([for doc in output.documents : jsondecode(doc).Statement[0].Action])) == 100
+    error_message = "Spilling must not drop or duplicate actions."
+  }
+}
+
+# The per-policy action lists equal the ones tools/cfngen generates for the
+# CloudFormation templates from the same actions.json: policy-chunks.json is
+# written by cfngen and kept fresh by `cfngen --check`.
+run "policies_match_the_cfngen_chunks" {
+  command = plan
+
+  module {
+    source = "./modules/cloud-scanner-role"
+  }
+
+  assert {
+    condition     = sort(keys(aws_iam_policy.read)) == sort(keys(jsondecode(file("${path.cwd}/tests/fixtures/policy-chunks.json")).account))
+    error_message = "The read policies must carry the same bucket numbers as the cfngen chunks."
+  }
+
+  assert {
+    condition = alltrue([
+      for k, p in aws_iam_policy.read :
+      jsondecode(p.policy).Statement[0].Action == jsondecode(file("${path.cwd}/tests/fixtures/policy-chunks.json")).account[k]
+    ])
+    error_message = "Every read policy must list the same actions as the cfngen chunk of the same number."
+  }
+}
+
+# The six spill rounds are fixed: only 1 or 6 buckets are accepted.
+run "three_buckets_are_rejected" {
+  command = plan
+
+  module {
+    source = "./modules/policy"
+  }
+
+  variables {
+    actions = ["s3:ListAllMyBuckets"]
+    buckets = 3
+  }
+
+  expect_failures = [var.buckets]
 }

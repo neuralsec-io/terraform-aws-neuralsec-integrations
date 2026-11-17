@@ -134,7 +134,21 @@ run "first_policy_description_is_stable_across_chunk_counts" {
   }
 
   assert {
-    condition     = aws_iam_policy.read[0].description == "Neuralsec organizations read actions, part 1 of 1."
+    condition     = aws_iam_policy.read["1"].description == "Neuralsec organizations read actions, part 1 of 1."
     error_message = "The first org reader policy must keep its released description, or upgrades replace it."
+  }
+}
+
+# Same actions as the policy tools/cfngen generates for the organizations template.
+run "policy_matches_the_cfngen_chunk" {
+  command = plan
+
+  module {
+    source = "./modules/cloud-scanner-org"
+  }
+
+  assert {
+    condition     = jsondecode(aws_iam_policy.read["1"].policy).Statement[0].Action == jsondecode(file("${path.cwd}/tests/fixtures/policy-chunks.json")).org_reader["1"]
+    error_message = "The org reader policy must list the same actions as the cfngen chunk."
   }
 }

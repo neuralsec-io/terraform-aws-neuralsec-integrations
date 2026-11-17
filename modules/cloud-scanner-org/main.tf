@@ -21,6 +21,8 @@ module "policy" {
   source = "../policy"
 
   actions = local.actions
+  # One small policy, always named read-01.
+  buckets = 1
 }
 
 resource "aws_iam_role" "this" {
@@ -31,22 +33,36 @@ resource "aws_iam_role" "this" {
   tags                 = { "neuralsec:integration-version" = module.policy.integration_version }
 }
 
-resource "aws_iam_policy" "read" {
-  count = module.policy.chunk_count
+locals {
+  read_documents = { for i, n in module.policy.chunk_numbers : tostring(n) => module.policy.documents[i] }
+}
 
-  name = "${local.role_name}-read-${format("%02d", count.index + 1)}"
-  # A description change forces replacement. The first policy keeps the text
-  # every earlier release created; later ones never name the chunk total, so
-  # a growing action list only adds policies.
-  description = count.index == 0 ? "Neuralsec organizations read actions, part 1 of 1." : "Neuralsec organizations read actions, part ${count.index + 1}."
-  policy      = module.policy.documents[count.index]
+resource "aws_iam_policy" "read" {
+  for_each = local.read_documents
+
+  name = "${local.role_name}-read-${format("%02d", tonumber(each.key))}"
+  # A description change forces replacement, so the first policy keeps the text
+  # every earlier release created.
+  description = each.key == "1" ? "Neuralsec organizations read actions, part 1 of 1." : "Neuralsec organizations read actions, part ${each.key}."
+  policy      = each.value
+}
+
+# Earlier releases numbered the read policy by position: update in place.
+moved {
+  from = aws_iam_policy.read[0]
+  to   = aws_iam_policy.read["1"]
 }
 
 resource "aws_iam_role_policy_attachment" "read" {
-  count = length(aws_iam_policy.read)
+  for_each = aws_iam_policy.read
 
   role       = aws_iam_role.this.name
-  policy_arn = aws_iam_policy.read[count.index].arn
+  policy_arn = each.value.arn
+}
+
+moved {
+  from = aws_iam_role_policy_attachment.read[0]
+  to   = aws_iam_role_policy_attachment.read["1"]
 }
 
 resource "terraform_data" "policy_guard" {

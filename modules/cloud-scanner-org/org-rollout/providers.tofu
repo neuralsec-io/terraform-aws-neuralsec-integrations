@@ -13,6 +13,14 @@
 # provider instance and no module, which is what the filter reports as an empty
 # rollout. It is not an error, so a plan-only test can assert that behaviour.
 
+# provider for_each needs OpenTofu 1.9. OpenTofu combines this with the
+# constraint in main.tf, so an older OpenTofu stops at init with a version
+# message instead of an unsupported argument error. Terraform never reads this
+# file.
+terraform {
+  required_version = ">= 1.9.0"
+}
+
 provider "aws" {
   alias    = "member"
   for_each = local.requested

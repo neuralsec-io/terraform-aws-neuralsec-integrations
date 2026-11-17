@@ -1,16 +1,31 @@
-# Read-only access to the RBAC objects of a cluster for the Neuralsec cloud scanner.
-# Apply once per EKS cluster listed in eks_clusters:
+# List-only Kubernetes access for the Neuralsec cloud scanner.
+# Apply once per EKS cluster listed in eks_clusters. Order: upgrade the module,
+# apply this manifest, then set eks_view_policy_association = false:
 #   kubectl apply -f scanner-rbac-view.yaml
-# It grants list on four rbac.authorization.k8s.io resources and nothing else
-# (the scanner only lists across all namespaces): no secrets, no configmaps, no wildcards. The group name must match
-# kubernetes_groups on the aws_eks_access_entry created by this module.
+# While that input is true (the default) the AmazonEKSViewPolicy association
+# stays; once it is false this ClusterRole is the whole grant. It allows only the verb list, across all namespaces, on the
+# resources the scanner inventories: no get, no watch, no secrets, no configmaps,
+# no pods/log, no wildcards. The group name must match kubernetes_groups on the
+# aws_eks_access_entry created by this module.
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
   name: neuralsec-scanner-rbac-view
 rules:
+  - apiGroups: ["apps"]
+    resources: ["deployments", "statefulsets", "daemonsets"]
+    verbs: ["list"]
+  - apiGroups: ["batch"]
+    resources: ["cronjobs"]
+    verbs: ["list"]
+  - apiGroups: [""]
+    resources: ["pods", "services", "serviceaccounts"]
+    verbs: ["list"]
+  - apiGroups: ["networking.k8s.io"]
+    resources: ["ingresses"]
+    verbs: ["list"]
   - apiGroups: ["rbac.authorization.k8s.io"]
-    resources: ["roles", "rolebindings", "clusterroles", "clusterrolebindings"]
+    resources: ["roles", "clusterroles", "rolebindings", "clusterrolebindings"]
     verbs: ["list"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1

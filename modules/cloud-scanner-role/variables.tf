@@ -30,14 +30,25 @@ variable "eks_clusters" {
   }
 }
 
+variable "eks_view_policy_association" {
+  description = "Keep the AmazonEKSViewPolicy access policy association on the EKS access entries for this release, so clusters whose ClusterRole is not applied yet keep their workload inventory. The list-only ClusterRole in kubernetes/scanner-rbac-view.yaml is the intended grant: apply it to every cluster, then set this to false. The default changes to false in the next minor release."
+  type        = bool
+  default     = true
+  nullable    = false
+}
+
 variable "state_locations" {
-  description = "Terraform or Pulumi state bucket prefixes the scanner may read. This input is the read grant: the role gets s3:GetObject on exactly these prefixes, and kms:Decrypt on the keys listed here. It is also what tells Neuralsec which locations are authoritative, so a location typed in the console is never read until it is added here. The module can see only its own tags: a provider default_tags block also tags this role and counts toward the 50 tag limit, as does the neuralsec:integration-version tag."
+  description = "Terraform or Pulumi state bucket prefixes the scanner may read. This input is the read grant: the role gets s3:GetObject on exactly these prefixes or exact state keys (.tfstate for terraform, .json for pulumi), only on buckets owned by this account or by bucket_owner, and kms:Decrypt on the keys listed here. It is also what tells Neuralsec which locations are authoritative, so a location typed in the console is never read until it is added here. The module can see only its own tags: a provider default_tags block also tags this role and counts toward the 50 tag limit, as does the neuralsec:integration-version tag."
   type = list(object({
     bucket      = string
     prefix      = optional(string, "")
     tool        = optional(string, "terraform")
     region      = optional(string, null)
     kms_key_arn = optional(string, "")
+    # Opt in to reading every object of the bucket. Required when prefix is empty.
+    whole_bucket = optional(bool, false)
+    # Account that owns the bucket. Defaults to the account of this role.
+    bucket_owner = optional(string, "")
   }))
   default  = []
   nullable = false
@@ -60,11 +71,32 @@ variable "state_locations" {
       for loc in var.state_locations :
       length(loc.prefix) <= 1024 &&
       !startswith(loc.prefix, "/") &&
-      !strcontains(loc.prefix, "*") &&
-      !strcontains(loc.prefix, "?") &&
-      !strcontains(loc.prefix, "$${")
+      !can(regex("[*?]", loc.prefix)) &&
+      length(regexall("\\$\\{", loc.prefix)) == 0
     ])
     error_message = "state_locations prefix must be at most 1024 characters, must not start with a slash (S3 keys never do) and must be a literal prefix: no wildcard characters and no template markers."
+  }
+
+  validation {
+    condition = alltrue([
+      for loc in var.state_locations :
+      loc.whole_bucket ? loc.prefix == "" : (endswith(loc.prefix, "/") || endswith(loc.prefix, loc.tool == "pulumi" ? ".json" : ".tfstate"))
+    ])
+    error_message = "state_locations prefix must be a non-empty prefix ending in a slash or an exact object key: ending in .tfstate for tool terraform, ending in .json for tool pulumi. To read a whole bucket set whole_bucket = true and leave prefix empty."
+  }
+
+  validation {
+    condition     = alltrue([for loc in var.state_locations : loc.bucket_owner == "" || can(regex("^[0-9]{12}$", loc.bucket_owner))])
+    error_message = "state_locations bucket_owner must be empty or a 12 digit account ID."
+  }
+
+  validation {
+    condition = alltrue([
+      for loc in var.state_locations : alltrue([
+        for other in var.state_locations : other.bucket != loc.bucket || other.bucket_owner == loc.bucket_owner
+      ])
+    ])
+    error_message = "state_locations entries of one bucket must carry the same bucket_owner. An empty value and an explicit id of this account count as different, so use one spelling for every entry of the bucket."
   }
 
   validation {

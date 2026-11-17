@@ -34,7 +34,7 @@ output "eks_rbac_group" {
 }
 
 output "eks_rbac_manifest_path" {
-  description = "Path of the read-only RBAC ClusterRole and ClusterRoleBinding manifest to kubectl apply in every cluster."
+  description = "Path of the list-only ClusterRole and ClusterRoleBinding manifest to kubectl apply in every cluster. Apply it to every cluster, then set eks_view_policy_association = false; until then the AmazonEKSViewPolicy association stays."
   value       = "${path.module}/kubernetes/scanner-rbac-view.yaml"
 }
 
@@ -66,4 +66,9 @@ output "state_location_tags" {
 output "deny_policy_document" {
   description = "Rendered explicit Deny policy for the API Gateway paths that return content. Exposed for policy test."
   value       = local.deny_policy_document
+}
+
+output "eks_upgrade_notice" {
+  description = "Non-empty while eks_view_policy_association keeps the broader AmazonEKSViewPolicy: apply the list-only ClusterRole manifest to every cluster and set the input to false."
+  value       = var.eks_view_policy_association && length(var.eks_clusters) > 0 ? "AmazonEKSViewPolicy is still associated with the scanner access entries. Apply kubernetes/scanner-rbac-view.yaml to every cluster, then set eks_view_policy_association = false. The default changes to false in the next minor release." : ""
 }

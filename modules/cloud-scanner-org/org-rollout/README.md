@@ -28,7 +28,7 @@ Neuralsec.
 | `member_access_role_name` | string | `OrganizationAccountAccessRole` | Your admin role, used only by this Terraform run |
 | `member_account_ids` | list(string) | `[]` | Accounts the rollout manages. Required by the OpenTofu path |
 | `exclude_account_ids` | list(string) | `[]` | Accounts to leave out even when ACTIVE |
-| `state_locations` | list(object) | `[]` | IaC state bucket prefixes every member role may read, passed to `cloud-scanner-role` unchanged |
+| `state_locations` | list(object) | `[]` | IaC state bucket prefixes every member role may read, passed to `cloud-scanner-role` unchanged. Each member role limits its S3 grants to buckets owned by its own account: for a central state bucket in another account set `bucket_owner` to that account id on the location, or the scanner cannot read it. |
 
 Only accounts whose state is `ACTIVE` are given a role. The state is read from the
 account `state`, and from the deprecated `status` when an account reports no state
@@ -80,6 +80,10 @@ management account id from the account ARNs of the list, `--management-account <
 sets it explicitly, and a `ManagementAccountId` key in a saved list wins over both.
 
 ## OpenTofu path
+
+This path requires OpenTofu 1.9 or newer, the first release with provider
+`for_each`; `providers.tofu` sets that version constraint, so an older OpenTofu
+stops at `tofu init`. The Terraform path needs Terraform 1.6 or newer.
 
 OpenTofu reads `providers.tofu`, which declares one provider instance per account
 with provider `for_each` and one `cloud-scanner-role` module per ACTIVE account.

@@ -24,6 +24,12 @@ module "cloud_scanner_role" {
   external_id          = "neuralsec-0123456789abcdef0123456789abcdef"
   neuralsec_broker_arn = "arn:aws:iam::111111111111:role/neuralsec-broker"
   eks_clusters         = ["example"]
+
+  state_locations = [
+    { bucket = "example-tf-state", prefix = "prod/", kms_key_arn = "arn:aws:kms:eu-west-1:111111111111:key/1234abcd-12ab-34cd-56ef-1234567890ab" },
+    { bucket = "example-tf-state", prefix = "shared/network.tfstate" },
+    { bucket = "example-pulumi-state", tool = "pulumi", whole_bucket = true },
+  ]
 }
 
 module "cloud_scanner_org" {

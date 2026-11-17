@@ -4,7 +4,8 @@
 # Pulumi state objects at the bucket prefixes the customer registers here. This
 # input is authoritative in both directions. It is the read grant, because the
 # role gets s3:GetObject on exactly these object ARNs and kms:Decrypt on exactly
-# the keys listed, and it is the discovery signal: the role carries one numbered
+# the keys listed, each pinned to the bucket owner account and, for the key, to
+# the registered buckets and prefixes by encryption context, and it is the discovery signal: the role carries one numbered
 # tag per location, which is how Neuralsec learns which locations the module
 # actually granted. A location typed in the console is a suggestion and is never
 # read until it appears in this input.
@@ -60,71 +61,97 @@ locals {
     for i, record in local.state_location_records : "neuralsec:state-locations-${i + 1}" => record
   }
 
-  state_bucket_arns = distinct([
-    for loc in var.state_locations : "arn:${data.aws_partition.current.partition}:s3:::${loc.bucket}"
-  ])
-
-  # Only objects under the registered prefix: the grant is the prefix plus
-  # everything below it, never the bucket.
-  state_object_arns = [
-    for loc in var.state_locations : "arn:${data.aws_partition.current.partition}:s3:::${loc.bucket}/${loc.prefix}*"
+  # One record per location with everything the statements need. The object ARN
+  # is the prefix plus everything below it, an exact key as is, or the whole
+  # bucket only when the location opted in with whole_bucket.
+  state_locs = [
+    for i, loc in var.state_locations : {
+      bucket     = loc.bucket
+      bucket_arn = "arn:${data.aws_partition.current.partition}:s3:::${loc.bucket}"
+      owner      = loc.bucket_owner != "" ? loc.bucket_owner : data.aws_caller_identity.current.account_id
+      whole      = loc.whole_bucket
+      region     = local.state_location_regions[i]
+      key        = loc.kms_key_arn
+      object_arn = (
+        loc.whole_bucket ? "arn:${data.aws_partition.current.partition}:s3:::${loc.bucket}/*" :
+        endswith(loc.prefix, "/") ? "arn:${data.aws_partition.current.partition}:s3:::${loc.bucket}/${loc.prefix}*" :
+        "arn:${data.aws_partition.current.partition}:s3:::${loc.bucket}/${loc.prefix}"
+      )
+      list_prefixes = loc.whole_bucket ? [] : endswith(loc.prefix, "/") ? [loc.prefix, "${loc.prefix}*"] : [loc.prefix]
+    }
   ]
+
+  state_bucket_arns = distinct([for l in local.state_locs : l.bucket_arn])
+
+  state_owners = distinct([for l in local.state_locs : l.owner])
 
   # One s3:ListBucket statement per bucket, conditioned on that bucket's
   # prefixes and their children, so listing a prefix the customer did not
   # register is denied even inside a registered bucket and a prefix of one
-  # bucket can never condition another.
+  # bucket can never condition another. aws:ResourceAccount pins the bucket
+  # owner, so a bucket re-created under the same name elsewhere is not read.
+  # A bucket registered with whole_bucket carries no prefix condition.
   state_list_statements = [
     for i, bucket in local.state_bucket_arns : {
       Sid      = "IacStateListRegisteredPrefixes${i + 1}"
       Effect   = "Allow"
       Action   = ["s3:ListBucket"]
       Resource = [bucket]
+      Condition = merge(
+        { StringEquals = { "aws:ResourceAccount" = [[for l in local.state_locs : l.owner if l.bucket_arn == bucket][0]] } },
+        anytrue([for l in local.state_locs : l.whole if l.bucket_arn == bucket]) ? {} : {
+          StringLike = {
+            "s3:prefix" = distinct(flatten([for l in local.state_locs : l.list_prefixes if l.bucket_arn == bucket]))
+          }
+        },
+      )
+    }
+  ]
+
+  # One s3:GetObject statement per bucket owner, so every object ARN is paired
+  # with the account that owns its bucket.
+  state_get_statements = [
+    for i, owner in local.state_owners : {
+      Sid      = "IacStateGetRegisteredObjects${i + 1}"
+      Effect   = "Allow"
+      Action   = ["s3:GetObject"]
+      Resource = distinct([for l in local.state_locs : l.object_arn if l.owner == owner])
       Condition = {
+        StringEquals = { "aws:ResourceAccount" = [owner] }
+      }
+    }
+  ]
+
+  state_kms_key_arns = distinct([for l in local.state_locs : l.key if l.key != ""])
+
+  # One kms:Decrypt statement per key. The S3 endpoint that may call it is the
+  # one of the locations using that key, and the encryption context ties the
+  # key to those buckets: S3 sets it to the bucket ARN when a bucket key is on
+  # and to the object ARN otherwise.
+  state_kms_statements = [
+    for i, key in local.state_kms_key_arns : {
+      Sid      = "IacStateDecryptRegisteredKeys${i + 1}"
+      Effect   = "Allow"
+      Action   = ["kms:Decrypt"]
+      Resource = [key]
+      Condition = {
+        StringEquals = {
+          "kms:ViaService" = distinct([for l in local.state_locs : "s3.${l.region}.amazonaws.com" if l.key == key])
+        }
         StringLike = {
-          "s3:prefix" = distinct(flatten([
-            for loc in var.state_locations :
-            [loc.prefix, "${loc.prefix}*"]
-            if "arn:${data.aws_partition.current.partition}:s3:::${loc.bucket}" == bucket
-          ]))
+          "kms:EncryptionContext:aws:s3:arn" = distinct(concat(
+            [for l in local.state_locs : l.bucket_arn if l.key == key],
+            [for l in local.state_locs : l.object_arn if l.key == key],
+          ))
         }
       }
     }
   ]
 
-  state_kms_key_arns = distinct([
-    for loc in var.state_locations : loc.kms_key_arn if loc.kms_key_arn != ""
-  ])
-
-  # Only the regions of the locations that carry a key: the condition is the
-  # S3 endpoint that may call kms:Decrypt, never the endpoint of a location
-  # without one.
-  state_kms_via_service = distinct([
-    for i, loc in var.state_locations : "s3.${local.state_location_regions[i]}.amazonaws.com"
-    if loc.kms_key_arn != ""
-  ])
-
   state_policy_statements = concat(
     local.state_list_statements,
-    [
-      {
-        Sid      = "IacStateGetRegisteredObjects"
-        Effect   = "Allow"
-        Action   = ["s3:GetObject"]
-        Resource = local.state_object_arns
-      },
-    ],
-    length(local.state_kms_key_arns) == 0 ? [] : [
-      {
-        Sid      = "IacStateDecryptRegisteredKeys"
-        Effect   = "Allow"
-        Action   = ["kms:Decrypt"]
-        Resource = local.state_kms_key_arns
-        Condition = {
-          StringEquals = { "kms:ViaService" = local.state_kms_via_service }
-        }
-      },
-    ],
+    local.state_get_statements,
+    local.state_kms_statements,
   )
 
   state_policy_document = jsonencode({
@@ -134,6 +161,8 @@ locals {
 }
 
 data "aws_region" "current" {}
+
+data "aws_caller_identity" "current" {}
 
 resource "aws_iam_policy" "iac_state" {
   count = local.state_locations_enabled ? 1 : 0

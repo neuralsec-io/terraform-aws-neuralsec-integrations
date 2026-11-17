@@ -19,10 +19,6 @@ locals {
     }]
   })
 
-  # Group the access entry places the role in. The ClusterRoleBinding in
-  # kubernetes/scanner-rbac-view.yaml binds this group to a read-only RBAC
-  # ClusterRole, because AmazonEKSViewPolicy does not cover
-  # rbac.authorization.k8s.io and AmazonEKSAdminViewPolicy can read Secrets.
   deny_policy_document = jsonencode({
     Version = "2012-10-17"
     Statement = [
@@ -38,9 +34,14 @@ locals {
     ]
   })
 
-  eks_rbac_group = "neuralsec:scanner-rbac-view"
-
+  # Kept only while eks_view_policy_association is true.
   eks_view_policy_arn = "arn:${data.aws_partition.current.partition}:eks::aws:cluster-access-policy/AmazonEKSViewPolicy"
+
+  # Group the access entry places the role in. The ClusterRoleBinding in
+  # kubernetes/scanner-rbac-view.yaml binds it to a ClusterRole that grants list
+  # and nothing else on the resources the scanner reads, which
+  # AmazonEKSViewPolicy exceeds (configmaps, pods/log and more).
+  eks_rbac_group = "neuralsec:scanner-rbac-view"
 
   # Source addresses every scan connects from. The scanner runs dual stack and
   # prefers IPv6, so towards a dual-stack endpoint it egresses from this one
@@ -82,15 +83,47 @@ resource "aws_iam_role" "this" {
   tags = merge(local.integration_version_tag, local.state_location_tags)
 }
 
-resource "aws_iam_policy" "read" {
-  count = module.policy.chunk_count
+locals {
+  # Read policy documents keyed by bucket number, so a growing action list adds
+  # a key and never renumbers one.
+  read_documents = { for i, n in module.policy.chunk_numbers : tostring(n) => module.policy.documents[i] }
+}
 
-  name = "${local.role_name}-read-${format("%02d", count.index + 1)}"
+resource "aws_iam_policy" "read" {
+  for_each = local.read_documents
+
+  name = "${local.role_name}-read-${format("%02d", tonumber(each.key))}"
   # A description change forces replacement. The first policy keeps the text
   # every earlier release created; later ones never name the chunk total, so
   # a growing action list only adds policies.
-  description = count.index == 0 ? "Neuralsec cloud scanner read actions, part 1 of 1." : "Neuralsec cloud scanner read actions, part ${count.index + 1}."
-  policy      = module.policy.documents[count.index]
+  description = each.key == "1" ? "Neuralsec cloud scanner read actions, part 1 of 1." : "Neuralsec cloud scanner read actions, part ${each.key}."
+  policy      = each.value
+}
+
+# Earlier releases numbered the read policies by position: update in place.
+moved {
+  from = aws_iam_policy.read[0]
+  to   = aws_iam_policy.read["1"]
+}
+moved {
+  from = aws_iam_policy.read[1]
+  to   = aws_iam_policy.read["2"]
+}
+moved {
+  from = aws_iam_policy.read[2]
+  to   = aws_iam_policy.read["3"]
+}
+moved {
+  from = aws_iam_policy.read[3]
+  to   = aws_iam_policy.read["4"]
+}
+moved {
+  from = aws_iam_policy.read[4]
+  to   = aws_iam_policy.read["5"]
+}
+moved {
+  from = aws_iam_policy.read[5]
+  to   = aws_iam_policy.read["6"]
 }
 
 # Explicit Deny for the API Gateway paths that return content. apigateway:GET is
@@ -110,24 +143,43 @@ resource "aws_iam_role_policy_attachment" "deny" {
 }
 
 resource "aws_iam_role_policy_attachment" "read" {
-  count = length(aws_iam_policy.read)
+  for_each = aws_iam_policy.read
 
   role       = aws_iam_role.this.name
-  policy_arn = aws_iam_policy.read[count.index].arn
+  policy_arn = each.value.arn
 }
 
-resource "aws_eks_access_entry" "this" {
-  for_each = toset(var.eks_clusters)
-
-  cluster_name  = each.value
-  principal_arn = aws_iam_role.this.arn
-  type          = "STANDARD"
-
-  kubernetes_groups = [local.eks_rbac_group]
+moved {
+  from = aws_iam_role_policy_attachment.read[0]
+  to   = aws_iam_role_policy_attachment.read["1"]
+}
+moved {
+  from = aws_iam_role_policy_attachment.read[1]
+  to   = aws_iam_role_policy_attachment.read["2"]
+}
+moved {
+  from = aws_iam_role_policy_attachment.read[2]
+  to   = aws_iam_role_policy_attachment.read["3"]
+}
+moved {
+  from = aws_iam_role_policy_attachment.read[3]
+  to   = aws_iam_role_policy_attachment.read["4"]
+}
+moved {
+  from = aws_iam_role_policy_attachment.read[4]
+  to   = aws_iam_role_policy_attachment.read["5"]
+}
+moved {
+  from = aws_iam_role_policy_attachment.read[5]
+  to   = aws_iam_role_policy_attachment.read["6"]
 }
 
+# Kept for this release only (eks_view_policy_association, default true): it
+# grants more than the scanner reads. Apply the list-only ClusterRole from
+# kubernetes/scanner-rbac-view.yaml and set the input to false; the default
+# becomes false in the next minor release.
 resource "aws_eks_access_policy_association" "this" {
-  for_each = toset(var.eks_clusters)
+  for_each = var.eks_view_policy_association ? toset(var.eks_clusters) : toset([])
 
   cluster_name  = each.value
   principal_arn = aws_iam_role.this.arn
@@ -138,6 +190,18 @@ resource "aws_eks_access_policy_association" "this" {
   }
 
   depends_on = [aws_eks_access_entry.this]
+}
+
+# The access entry authenticates the role and puts it in the group; every
+# Kubernetes permission comes from the ClusterRole the customer applies.
+resource "aws_eks_access_entry" "this" {
+  for_each = toset(var.eks_clusters)
+
+  cluster_name  = each.value
+  principal_arn = aws_iam_role.this.arn
+  type          = "STANDARD"
+
+  kubernetes_groups = [local.eks_rbac_group]
 }
 
 # IAM rejects an eleventh attached managed policy and a document over 6144

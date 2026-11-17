@@ -258,3 +258,27 @@ run "state_is_read_and_status_is_the_fallback" {
     error_message = "Account 111111111111 carries only a state and 222222222222 only a status; both are ACTIVE and both must be rolled out."
   }
 }
+
+# provider for_each needs OpenTofu 1.9: providers.tofu must carry the version
+# constraint, and the README must state it.
+run "opentofu_path_requires_1_9" {
+  command = plan
+
+  module {
+    source = "./modules/cloud-scanner-org/org-rollout"
+  }
+
+  variables {
+    member_account_ids = []
+  }
+
+  assert {
+    condition     = can(regex("required_version\\s*=\\s*\">= 1\\.9\\.0\"", file("${path.cwd}/modules/cloud-scanner-org/org-rollout/providers.tofu")))
+    error_message = "providers.tofu must require OpenTofu 1.9 or newer."
+  }
+
+  assert {
+    condition     = can(regex("OpenTofu 1\\.9", file("${path.cwd}/modules/cloud-scanner-org/org-rollout/README.md")))
+    error_message = "The org-rollout README must state the OpenTofu 1.9 requirement."
+  }
+}
