@@ -30,11 +30,54 @@ Neuralsec.
 | `exclude_account_ids` | list(string) | `[]` | Accounts to leave out even when ACTIVE |
 | `state_locations` | list(object) | `[]` | IaC state bucket prefixes every member role may read, passed to `cloud-scanner-role` unchanged |
 
-Accounts reported `SUSPENDED` or `PENDING_CLOSURE` by
-`aws_organizations_organization` are never given a role and are listed in the
+Only accounts whose state is `ACTIVE` are given a role. The state is read from the
+account `state`, and from the deprecated `status` when an account reports no state
+(the AWS provider `~> 6.70` this root requires exposes `state`). Accounts reported
+`SUSPENDED` or `PENDING_CLOSURE` are never given a role and are listed in the
 `skipped_account_ids` output, so a closed account cannot fail an apply. An empty
 `member_account_ids` is a valid no-op: it creates no provider instance and no
 module, and every organization account is reported as skipped.
+
+## The management account
+
+The management account is never part of the member set, even when it is ACTIVE and
+listed in `member_account_ids`: it has no member access role, and a role created
+there would be a different install. It appears in `skipped_account_ids`, and the
+`management_account_id` output names it. To cover the management account, install
+the standalone role there with the default provider of an apply that runs as that
+account:
+
+```
+module "management_account_scanner_role" {
+  source = "neuralsec-io/neuralsec-integrations/aws//modules/cloud-scanner-role"
+
+  external_id          = var.external_id
+  neuralsec_broker_arn = var.neuralsec_broker_arn
+}
+```
+
+If an earlier version of this root, or your own list, put the management account
+in the member set, its state holds `module.member_role["<mgmt>"]`. Taking the account
+out of the set would plan to destroy that role, which may be one you made by hand. Keep
+the role out of the plan with a `removed` block (OpenTofu path), then apply:
+
+```
+removed {
+  from = module.member_role["111111111111"]
+
+  lifecycle {
+    destroy = false
+  }
+}
+```
+
+Use the management account id in place of `111111111111`. The plain Terraform
+generator writes the same block, for `module.member_role_<mgmt>`, when it finds the
+management account among the accounts it managed before.
+
+The plain Terraform generator leaves the management account out too. It reads the
+management account id from the account ARNs of the list, `--management-account <id>`
+sets it explicitly, and a `ManagementAccountId` key in a saved list wins over both.
 
 ## OpenTofu path
 
@@ -45,8 +88,10 @@ A provider `for_each` cannot read a data source, so the account list comes in as
 
 ```
 aws organizations list-accounts \
-  --query 'Accounts[?Status==`ACTIVE`].Id' --output json
+  --query 'Accounts[?State==`ACTIVE` || (State==null && Status==`ACTIVE`)].Id' --output json
 ```
+
+Leave the management account id out of the list or keep it: the rollout skips it.
 
 Then, from this directory:
 
@@ -80,7 +125,29 @@ terraform plan -var 'external_id=neuralsec-...' \
 ```
 
 Options: `--accounts <file>` for a saved `list-accounts` JSON instead of the CLI,
-`--out <file>`, `--role-name`, `--partition`, `--exclude <id,id>`.
+`--out <file>`, `--role-name`, `--partition`, `--exclude <id,id>`,
+`--management-account <id>` and `--keep <id,id>`.
+
+The generator keeps a provider block for every account it managed before. The
+previous run is read from the existing output file, so an account that is
+suspended or closed after its role was created still has a provider, and
+Terraform can plan the removal of its module instead of failing on a missing
+provider. `--keep` adds ids when the output file is gone. A retained provider is
+marked with a `Retained:` comment and has no module. Once the account is closed
+for good, stop tracking the role in state, then delete the provider block:
+
+```
+removed {
+  from = module.member_role_111111111111
+
+  lifecycle {
+    destroy = false
+  }
+}
+```
+
+or `terraform state rm module.member_role_111111111111`. Terraform cannot destroy a
+role in a closed account, so use one of the two instead of a plain removal.
 
 Both paths report `member_role_arns` keyed by account ID.
 
@@ -116,4 +183,4 @@ variant written for the other. The module-local OpenTofu test lives in
 Destroy with the same path that applied it, before removing accounts from the
 input list: a provider instance has to outlive the module instance that used it.
 Keep suspended accounts in `member_account_ids` until their module instance is
-destroyed.
+destroyed or its state is removed as described above.

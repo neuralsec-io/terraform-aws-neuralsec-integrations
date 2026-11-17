@@ -151,7 +151,7 @@ resource "aws_iam_role_policy_attachment" "iac_state" {
 }
 
 # Fails the plan with a readable message instead of an IAM error on apply: the
-# encoded tag has to fit one tag value, and a role can carry at most 50 tags.
+# encoded tag has to fit one tag value, and a role can carry at most 50 tags, one of them the release version tag.
 # The resource only exists once a location is registered, so a role with an
 # empty input plans no new object at all.
 resource "terraform_data" "state_location_guard" {
@@ -168,8 +168,8 @@ resource "terraform_data" "state_location_guard" {
     }
 
     precondition {
-      condition     = length(local.state_location_tags) <= 50
-      error_message = "state_locations holds ${length(local.state_location_tags)} entries, but a role can carry at most 50 tags."
+      condition     = length(local.state_location_tags) <= 49
+      error_message = "state_locations holds ${length(local.state_location_tags)} entries, but a role can carry at most 49 state location tags next to the release version tag."
     }
   }
 }

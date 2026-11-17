@@ -1,6 +1,8 @@
 locals {
   role_name = "neuralsec-cloud-scanner"
 
+  integration_version_tag = { "neuralsec:integration-version" = module.policy.integration_version }
+
   actions = jsondecode(file("${path.module}/../policy/actions.json")).account
 
   # The scanner uses no static credentials and no other principal may assume the
@@ -21,6 +23,21 @@ locals {
   # kubernetes/scanner-rbac-view.yaml binds this group to a read-only RBAC
   # ClusterRole, because AmazonEKSViewPolicy does not cover
   # rbac.authorization.k8s.io and AmazonEKSAdminViewPolicy can read Secrets.
+  deny_policy_document = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      for index, entry in module.policy.deny_resources : {
+        Sid    = index == 0 ? "DenyApiGatewayContentPaths" : "DenyApiGatewayContentPaths${index + 1}"
+        Effect = "Deny"
+        Action = [entry.action]
+        Resource = [
+          for arn in entry.resources :
+          replace(arn, "arn:aws:", "arn:${data.aws_partition.current.partition}:")
+        ]
+      }
+    ]
+  })
+
   eks_rbac_group = "neuralsec:scanner-rbac-view"
 
   eks_view_policy_arn = "arn:${data.aws_partition.current.partition}:eks::aws:cluster-access-policy/AmazonEKSViewPolicy"
@@ -59,10 +76,10 @@ resource "aws_iam_role" "this" {
   description          = "Neuralsec read-only cloud inventory role. Assumed through the Neuralsec broker with the connection ExternalId."
   assume_role_policy   = local.trust_policy
   max_session_duration = 3600
-  # Null until the customer registers a state location, so a role installed by
-  # an earlier release plans no change. These tags are the discovery channel for
-  # the IaC state exception, see state_locations.tf.
-  tags = local.state_locations_enabled ? local.state_location_tags : null
+  # The release version tag, plus one numbered tag per registered state
+  # location: those are the discovery channel for the IaC state exception, see
+  # state_locations.tf. Adding or changing a tag updates the role in place.
+  tags = merge(local.integration_version_tag, local.state_location_tags)
 }
 
 resource "aws_iam_policy" "read" {
@@ -74,6 +91,22 @@ resource "aws_iam_policy" "read" {
   # a growing action list only adds policies.
   description = count.index == 0 ? "Neuralsec cloud scanner read actions, part 1 of 1." : "Neuralsec cloud scanner read actions, part ${count.index + 1}."
   policy      = module.policy.documents[count.index]
+}
+
+# Explicit Deny for the API Gateway paths that return content. apigateway:GET is
+# a read action, but a GET on these paths returns API key values and the exported
+# or SDK bundle of a stage. An explicit Deny wins over every Allow, so no policy
+# attached later can bring them back. A separate small policy keeps the read
+# documents free for actions.
+resource "aws_iam_policy" "deny" {
+  name        = "${local.role_name}-deny"
+  description = "Neuralsec cloud scanner explicit denies for API Gateway content paths."
+  policy      = local.deny_policy_document
+}
+
+resource "aws_iam_role_policy_attachment" "deny" {
+  role       = aws_iam_role.this.name
+  policy_arn = aws_iam_policy.deny.arn
 }
 
 resource "aws_iam_role_policy_attachment" "read" {
@@ -118,8 +151,8 @@ resource "terraform_data" "policy_guard" {
 
   lifecycle {
     precondition {
-      condition     = module.policy.chunk_count + (local.state_locations_enabled ? 1 : 0) <= 10
-      error_message = "The exported action list needs ${module.policy.chunk_count} managed policies${local.state_locations_enabled ? " plus the IaC state policy" : ""}, but IAM allows at most 10 per role."
+      condition     = module.policy.chunk_count + 1 + (local.state_locations_enabled ? 1 : 0) <= 10
+      error_message = "The exported action list needs ${module.policy.chunk_count} managed policies, plus the deny policy${local.state_locations_enabled ? " and the IaC state policy" : ""}, but IAM allows at most 10 per role."
     }
 
     precondition {

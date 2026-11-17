@@ -31,7 +31,7 @@ variable "eks_clusters" {
 }
 
 variable "state_locations" {
-  description = "Terraform or Pulumi state bucket prefixes the scanner may read. This input is the read grant: the role gets s3:GetObject on exactly these prefixes, and kms:Decrypt on the keys listed here. It is also what tells Neuralsec which locations are authoritative, so a location typed in the console is never read until it is added here. The module can see only its own tags: a provider default_tags block also tags this role and counts toward the 50 tag limit."
+  description = "Terraform or Pulumi state bucket prefixes the scanner may read. This input is the read grant: the role gets s3:GetObject on exactly these prefixes, and kms:Decrypt on the keys listed here. It is also what tells Neuralsec which locations are authoritative, so a location typed in the console is never read until it is added here. The module can see only its own tags: a provider default_tags block also tags this role and counts toward the 50 tag limit, as does the neuralsec:integration-version tag."
   type = list(object({
     bucket      = string
     prefix      = optional(string, "")
@@ -89,8 +89,8 @@ variable "state_locations" {
   }
 
   validation {
-    condition     = length(var.state_locations) <= 50
-    error_message = "state_locations holds ${length(var.state_locations)} entries, over the 50 tag limit IAM allows on one role."
+    condition     = length(var.state_locations) <= 49
+    error_message = "state_locations holds ${length(var.state_locations)} entries, over the 49 allowed: IAM allows 50 tags on one role and one is the release version tag."
   }
 
   validation {

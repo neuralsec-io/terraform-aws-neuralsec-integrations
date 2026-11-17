@@ -34,6 +34,22 @@ run "role_name_is_fixed" {
   }
 }
 
+run "role_carries_the_release_version_tag" {
+  command = plan
+
+  module {
+    source = "./modules/cloud-scanner-org"
+  }
+
+  assert {
+    condition = (
+      aws_iam_role.this.tags["neuralsec:integration-version"] == jsondecode(file("${path.cwd}/modules/policy/version.json")).integration_version &&
+      aws_iam_role.this.tags["neuralsec:integration-version"] == regex("(?m)^## v([0-9]+[.][0-9]+[.][0-9]+)", file("${path.cwd}/../CHANGELOG.md"))[0]
+    )
+    error_message = "The org reader role must carry neuralsec:integration-version equal to the newest CHANGELOG release."
+  }
+}
+
 run "trust_policy_only_trusts_the_broker_with_the_external_id" {
   command = plan
 

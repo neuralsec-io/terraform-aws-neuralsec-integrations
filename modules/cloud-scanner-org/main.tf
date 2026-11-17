@@ -28,6 +28,7 @@ resource "aws_iam_role" "this" {
   description          = "Neuralsec read-only AWS Organizations role for the management or delegated administrator account."
   assume_role_policy   = local.trust_policy
   max_session_duration = 3600
+  tags                 = { "neuralsec:integration-version" = module.policy.integration_version }
 }
 
 resource "aws_iam_policy" "read" {

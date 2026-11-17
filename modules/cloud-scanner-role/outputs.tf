@@ -62,3 +62,8 @@ output "state_location_tags" {
   description = "Tags set on the role to publish the authoritative IaC state locations, one numbered tag per location. Exposed for the policy test."
   value       = local.state_location_tags
 }
+
+output "deny_policy_document" {
+  description = "Rendered explicit Deny policy for the API Gateway paths that return content. Exposed for policy test."
+  value       = local.deny_policy_document
+}

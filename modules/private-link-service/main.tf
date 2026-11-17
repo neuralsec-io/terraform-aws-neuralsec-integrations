@@ -1,8 +1,10 @@
 locals {
-  # The release this module ships in. Bump it with the release tag: every
-  # resource carries it as neuralsec:integration-version, and Neuralsec flags a
-  # link whose value is older than the current release.
-  integration_version = "0.3.2"
+  # The release this module ships in, read from the one file every release
+  # version comes from. The module is published together with the policy
+  # module, so the file is always next to it. Every resource carries it as
+  # neuralsec:integration-version, and Neuralsec flags a link whose value is
+  # older than the current release.
+  integration_version = jsondecode(file("${path.module}/../policy/version.json")).integration_version
 
   # One place for the release tags, merged into every taggable resource below.
   # A test fails when one of them lacks a key.
@@ -59,10 +61,18 @@ locals {
   # within the VPC, so their rule covers the VPC CIDR; fixed IPs are named one
   # by one.
   egress_cidrs = local.create_nlb ? (
-    var.target_alb_arn != null || length(var.target_instance_ids) > 0 ? [data.aws_vpc.this[0].cidr_block] : [
+    var.target_alb_arn != null || length(var.target_instance_ids) > 0 ? local.vpc_cidrs : [
       for address in var.target_ips : "${address}/32"
     ]
   ) : []
+
+  # Every CIDR block associated with the VPC, the primary one and the secondary
+  # ones: a target can sit in any of them. A block that is being removed or has
+  # failed is left out.
+  vpc_cidrs = local.create_nlb && (var.target_alb_arn != null || length(var.target_instance_ids) > 0) ? sort(distinct(concat(
+    [data.aws_vpc.this[0].cidr_block],
+    [for association in data.aws_vpc.this[0].cidr_block_associations : association.cidr_block if association.state == "associated"],
+  ))) : []
 
   # PrivateLink traffic comes from the Neuralsec endpoint network interfaces,
   # not from an address the customer can name, so the module turns the inbound

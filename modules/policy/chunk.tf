@@ -30,18 +30,27 @@ variable "actions" {
     error_message = "Only read actions are allowed: List, Describe, Get, BatchGet, Search, Select or Lookup, plus the named exceptions iam:GenerateCredentialReport and apigateway:GET."
   }
 
+  # The shared denylist, forbidden-actions.json, is also read by
+  # scripts/check-actions.sh and generated into the CloudFormation guard rules by
+  # tools/cfngen. Exact names and case-insensitive name patterns that return
+  # content or credentials are never allowed.
   validation {
     condition = alltrue([
-      for action in var.actions : !contains([
-        "s3:getobject", "s3:getobjectversion", "s3:selectobjectcontent",
-        "secretsmanager:getsecretvalue", "secretsmanager:batchgetsecretvalue",
-        "ssm:getparameter", "ssm:getparameters", "ssm:getparametersbypath",
-        "kms:decrypt", "logs:getlogevents", "logs:filterlogevents",
-        "dynamodb:getitem", "dynamodb:scan", "dynamodb:query",
-        "sqs:receivemessage", "ecr:batchgetimage", "ecr:getdownloadurlforlayer",
-      ], lower(action))
+      for action in var.actions : !contains(
+        [for name in jsondecode(file("${path.module}/forbidden-actions.json")).exact : lower(name)],
+        lower(action)
+      )
     ])
-    error_message = "Actions that read customer content (object bodies, secret values, parameters, logs, items, messages, image layers) are never allowed."
+    error_message = "Actions that read customer content or return credentials (object bodies, secret values, parameters, logs, items, messages, image layers, passwords, tokens) are never allowed. See forbidden-actions.json."
+  }
+
+  validation {
+    condition = alltrue([
+      for action in var.actions :
+      !can(regex("(?i)(${join("|", jsondecode(file("${path.module}/forbidden-actions.json")).patterns)})", split(":", action)[1]))
+      || contains([for name in jsondecode(file("${path.module}/forbidden-actions.json")).pattern_exceptions : lower(name)], lower(action))
+    ])
+    error_message = "Action names that match a credential or content pattern (Credentials, Password, SecretValue, AuthorizationToken, SessionToken, FederationToken, GetObject, GetRecords, QueryResults) are never allowed. See forbidden-actions.json."
   }
 }
 
@@ -93,6 +102,26 @@ locals {
   ]
 
   max_document_bytes = length(local.documents) == 0 ? 0 : max([for doc in local.documents : length(doc)]...)
+
+  # Release version stamped on the roles as the neuralsec:integration-version
+  # tag. version.json is kept equal to the newest CHANGELOG release by a test,
+  # and tools/cfngen stamps the same value into the CloudFormation templates.
+  integration_version = jsondecode(file("${path.module}/version.json")).integration_version
+
+  # Resources of the explicit apigateway:GET Deny. apigateway:GET is the one
+  # read action that can reach content: API keys, and the exported or SDK
+  # bundles of a stage. actions.json may carry its own deny_resources, a list
+  # of {action, resources} entries, each one Deny statement; without it the
+  # static apigateway:GET list in forbidden-actions.json applies, and
+  # tools/cfngen and the CloudFormation guard read the same entries. The ARNs
+  # use the aws partition here and the role module swaps in its own.
+  deny_resources = try(
+    jsondecode(file("${path.module}/actions.json")).deny_resources,
+    [{
+      action    = "apigateway:GET"
+      resources = jsondecode(file("${path.module}/forbidden-actions.json")).deny_resources
+    }],
+  )
 }
 
 output "actions" {
@@ -113,4 +142,14 @@ output "chunk_count" {
 output "max_document_bytes" {
   description = "Size in bytes of the largest generated document."
   value       = local.max_document_bytes
+}
+
+output "integration_version" {
+  description = "Release version of this module set, written to the neuralsec:integration-version tag of the scanner roles."
+  value       = local.integration_version
+}
+
+output "deny_resources" {
+  description = "Entries of the explicit Deny, each with an action and its resource ARNs written with the aws partition."
+  value       = local.deny_resources
 }

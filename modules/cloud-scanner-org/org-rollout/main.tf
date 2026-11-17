@@ -16,8 +16,12 @@
 #              aliased provider and module block per active account.
 #
 # Both paths still read aws_organizations_organization, so a suspended or
-# pending closure account is skipped by the status filter, never by a provider
-# error, and shows up in skipped_account_ids.
+# pending closure account is skipped by the state filter, never by a provider
+# error, and shows up in skipped_account_ids. The filter reads the account
+# `state`, and falls back to the deprecated `status` when a state is absent. The
+# management account is never part of the member set: its member access role does
+# not exist, so the rollout skips it. Cover it with a standalone
+# cloud-scanner-role module and the default provider, see the README.
 #
 # This root never hands any credential to the scanner. The member access role is
 # used only by the customer's own Terraform run, and only to create the scanner
@@ -43,17 +47,26 @@ locals {
     for account in data.aws_organizations_organization.current.accounts : account.id => account
   }
 
+  management_account_id = data.aws_organizations_organization.current.master_account_id
+
+  # The account state: `state` when the provider reports it, otherwise the
+  # deprecated `status`. Both read ACTIVE, SUSPENDED or PENDING_CLOSURE.
+  account_states = {
+    for id, account in local.accounts :
+    id => try(account.state, null) != null && try(account.state, "") != "" ? account.state : account.status
+  }
+
   requested = toset(var.member_account_ids)
   excluded  = toset(var.exclude_account_ids)
 
   rollout_accounts = {
     for id, account in local.accounts : id => account
-    if contains(local.requested, id) && account.status == "ACTIVE" && !contains(local.excluded, id)
+    if contains(local.requested, id) && local.account_states[id] == "ACTIVE" && !contains(local.excluded, id) && id != local.management_account_id
   }
 
   skipped_account_ids = sort([
     for id, account in local.accounts : id
-    if !contains(local.requested, id) || account.status != "ACTIVE" || contains(local.excluded, id)
+    if !contains(local.requested, id) || local.account_states[id] != "ACTIVE" || contains(local.excluded, id) || id == local.management_account_id
   ])
 
   member_role_name = "neuralsec-cloud-scanner"
@@ -65,8 +78,13 @@ output "member_account_ids" {
 }
 
 output "skipped_account_ids" {
-  description = "Accounts left out because of status, exclude_account_ids or member_account_ids."
+  description = "Accounts left out because of state, the management account, exclude_account_ids or member_account_ids."
   value       = local.skipped_account_ids
+}
+
+output "management_account_id" {
+  description = "The organization management account. It is never given a member role by this root; install the standalone cloud-scanner-role module there."
+  value       = local.management_account_id
 }
 
 output "member_role_name" {

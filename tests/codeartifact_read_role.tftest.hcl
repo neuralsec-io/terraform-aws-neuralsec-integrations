@@ -33,7 +33,7 @@ variables {
   ]
 }
 
-run "role_matches_the_app_api_snippet" {
+run "role_matches_the_documented_snippet" {
   command = plan
 
   module {

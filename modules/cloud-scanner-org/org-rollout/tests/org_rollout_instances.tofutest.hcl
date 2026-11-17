@@ -12,36 +12,47 @@
 mock_provider "aws" {
   mock_data "aws_organizations_organization" {
     defaults = {
-      id  = "o-synthetic01"
-      arn = "arn:aws:organizations::111111111111:organization/o-synthetic01"
+      id                = "o-synthetic01"
+      master_account_id = "999999999999"
+      arn               = "arn:aws:organizations::999999999999:organization/o-synthetic01"
       accounts = [
         {
           id               = "111111111111"
-          arn              = "arn:aws:organizations::111111111111:account/o-synthetic01/111111111111"
+          arn              = "arn:aws:organizations::999999999999:account/o-synthetic01/111111111111"
           email            = "one@example.com"
           name             = "synthetic-one"
           state            = "ACTIVE"
-          status           = "ACTIVE"
+          status           = ""
           joined_method    = "INVITED"
           joined_timestamp = "2026-01-02T03:04:05Z"
         },
         {
           id               = "222222222222"
-          arn              = "arn:aws:organizations::111111111111:account/o-synthetic01/222222222222"
+          arn              = "arn:aws:organizations::999999999999:account/o-synthetic01/222222222222"
           email            = "two@example.com"
           name             = "synthetic-two"
-          state            = "ACTIVE"
+          state            = ""
           status           = "ACTIVE"
           joined_method    = "INVITED"
           joined_timestamp = "2026-01-02T03:04:05Z"
         },
         {
           id               = "333333333333"
-          arn              = "arn:aws:organizations::111111111111:account/o-synthetic01/333333333333"
+          arn              = "arn:aws:organizations::999999999999:account/o-synthetic01/333333333333"
           email            = "three@example.com"
           name             = "synthetic-three"
           state            = "SUSPENDED"
           status           = "SUSPENDED"
+          joined_method    = "INVITED"
+          joined_timestamp = "2026-01-02T03:04:05Z"
+        },
+        {
+          id               = "999999999999"
+          arn              = "arn:aws:organizations::999999999999:account/o-synthetic01/999999999999"
+          email            = "management@example.com"
+          name             = "synthetic-management"
+          state            = "ACTIVE"
+          status           = "ACTIVE"
           joined_method    = "INVITED"
           joined_timestamp = "2026-01-02T03:04:05Z"
         },
@@ -66,7 +77,7 @@ override_module {
 variables {
   external_id          = "neuralsec-0123456789abcdef0123456789abcdef"
   neuralsec_broker_arn = "arn:aws:iam::111111111111:role/neuralsec-cloud-scanner-broker"
-  member_account_ids   = ["111111111111", "222222222222", "333333333333"]
+  member_account_ids   = ["111111111111", "222222222222", "333333333333", "999999999999"]
 }
 
 run "one_module_instance_per_active_account" {
@@ -87,7 +98,7 @@ run "suspended_account_is_skipped_without_a_provider_error" {
   command = plan
 
   assert {
-    condition     = output.skipped_account_ids == tolist(["333333333333"])
-    error_message = "The suspended account must be listed as skipped."
+    condition     = output.skipped_account_ids == tolist(["333333333333", "999999999999"])
+    error_message = "The suspended account and the management account must be listed as skipped."
   }
 }

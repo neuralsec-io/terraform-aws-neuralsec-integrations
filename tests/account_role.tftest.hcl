@@ -56,6 +56,22 @@ run "role_name_is_fixed" {
   }
 }
 
+run "role_carries_the_release_version_tag" {
+  command = plan
+
+  module {
+    source = "./modules/cloud-scanner-role"
+  }
+
+  assert {
+    condition = (
+      aws_iam_role.this.tags["neuralsec:integration-version"] == jsondecode(file("${path.cwd}/modules/policy/version.json")).integration_version &&
+      aws_iam_role.this.tags["neuralsec:integration-version"] == regex("(?m)^## v([0-9]+[.][0-9]+[.][0-9]+)", file("${path.cwd}/../CHANGELOG.md"))[0]
+    )
+    error_message = "The role must carry neuralsec:integration-version equal to the newest CHANGELOG release."
+  }
+}
+
 run "trust_policy_only_trusts_the_broker_with_the_external_id" {
   command = plan
 
@@ -99,7 +115,7 @@ run "policies_cover_exactly_the_exported_account_actions" {
   }
 
   assert {
-    condition     = output.policy_chunk_count >= 1 && output.policy_chunk_count <= 10
+    condition     = output.policy_chunk_count >= 1 && output.policy_chunk_count + 1 <= 10
     error_message = "IAM allows at most 10 customer managed policies per role."
   }
 
@@ -124,6 +140,45 @@ run "policies_cover_exactly_the_exported_account_actions" {
       ])
     ])
     error_message = "Organizations actions belong to the org-reader role, never the member role, except the dual read organizations:DescribeOrganization."
+  }
+}
+
+# apigateway:GET can return API key values and the exported or SDK bundle of a
+# stage, so the role carries an explicit Deny on those paths. The same statement
+# is generated into the CloudFormation template by tools/cfngen.
+run "api_gateway_content_paths_are_denied" {
+  command = plan
+
+  module {
+    source = "./modules/cloud-scanner-role"
+  }
+
+  assert {
+    condition = jsondecode(output.deny_policy_document).Statement == [{
+      Sid    = "DenyApiGatewayContentPaths"
+      Effect = "Deny"
+      Action = ["apigateway:GET"]
+      Resource = [
+        "arn:aws:apigateway:*::/apikeys",
+        "arn:aws:apigateway:*::/apikeys/*",
+        "arn:aws:apigateway:*::/apis/*/exports/*",
+        "arn:aws:apigateway:*::/restapis/*/stages/*/exports/*",
+        "arn:aws:apigateway:*::/restapis/*/stages/*/sdks/*",
+        "arn:aws:apigateway:*::/usageplans/*/keys",
+        "arn:aws:apigateway:*::/usageplans/*/keys/*",
+      ]
+    }]
+    error_message = "The deny policy must deny apigateway:GET on the API key, export and SDK paths and nothing else."
+  }
+
+  assert {
+    condition     = aws_iam_policy.deny.name == "neuralsec-cloud-scanner-deny" && aws_iam_role_policy_attachment.deny.role == "neuralsec-cloud-scanner"
+    error_message = "The deny policy must be attached to the role."
+  }
+
+  assert {
+    condition     = alltrue([for doc in output.policy_documents : alltrue([for s in jsondecode(doc).Statement : s.Effect == "Allow"])])
+    error_message = "The read policies must hold Allow statements only."
   }
 }
 
@@ -231,6 +286,163 @@ run "rejects_a_content_read_action" {
   }
 
   expect_failures = [var.actions]
+}
+
+run "rejects_the_lambda_layer_content_read" {
+  command = plan
+
+  module {
+    source = "./modules/policy"
+  }
+
+  variables {
+    actions = ["iam:ListRoles", "lambda:GetLayerVersion"]
+  }
+
+  expect_failures = [var.actions]
+}
+
+run "rejects_a_credential_vending_action" {
+  command = plan
+
+  module {
+    source = "./modules/policy"
+  }
+
+  variables {
+    actions = ["iam:ListRoles", "sts:GetSessionToken"]
+  }
+
+  expect_failures = [var.actions]
+}
+
+run "rejects_a_credential_vending_action_in_any_case" {
+  command = plan
+
+  module {
+    source = "./modules/policy"
+  }
+
+  variables {
+    actions = ["iam:ListRoles", "STS:getfederationtoken"]
+  }
+
+  expect_failures = [var.actions]
+}
+
+run "rejects_a_name_matching_the_credentials_pattern" {
+  command = plan
+
+  module {
+    source = "./modules/policy"
+  }
+
+  variables {
+    actions = ["iam:ListRoles", "newservice:GetThingCredentials"]
+  }
+
+  expect_failures = [var.actions]
+}
+
+run "rejects_a_name_matching_the_password_pattern_in_any_case" {
+  command = plan
+
+  module {
+    source = "./modules/policy"
+  }
+
+  variables {
+    actions = ["iam:ListRoles", "newservice:getadminpassword"]
+  }
+
+  expect_failures = [var.actions]
+}
+
+run "rejects_a_name_matching_the_get_object_suffix" {
+  command = plan
+
+  module {
+    source = "./modules/policy"
+  }
+
+  variables {
+    actions = ["iam:ListRoles", "newservice:GetObject"]
+  }
+
+  expect_failures = [var.actions]
+}
+
+run "rejects_a_name_matching_the_query_results_suffix" {
+  command = plan
+
+  module {
+    source = "./modules/policy"
+  }
+
+  variables {
+    actions = ["iam:ListRoles", "newservice:GetBigQueryResults"]
+  }
+
+  expect_failures = [var.actions]
+}
+
+run "rejects_a_name_matching_the_get_records_suffix" {
+  command = plan
+
+  module {
+    source = "./modules/policy"
+  }
+
+  variables {
+    actions = ["iam:ListRoles", "newservice:GetRecords"]
+  }
+
+  expect_failures = [var.actions]
+}
+
+run "rejects_the_ecr_authorization_token" {
+  command = plan
+
+  module {
+    source = "./modules/policy"
+  }
+
+  variables {
+    actions = ["iam:ListRoles", "ecr:GetAuthorizationToken"]
+  }
+
+  expect_failures = [var.actions]
+}
+
+run "rejects_a_dynamodb_item_read" {
+  command = plan
+
+  module {
+    source = "./modules/policy"
+  }
+
+  variables {
+    actions = ["iam:ListRoles", "dynamodb:BatchGetItem"]
+  }
+
+  expect_failures = [var.actions]
+}
+
+run "pattern_exceptions_stay_allowed" {
+  command = plan
+
+  module {
+    source = "./modules/policy"
+  }
+
+  variables {
+    actions = ["iam:GetAccountPasswordPolicy", "iam:ListServiceSpecificCredentials"]
+  }
+
+  assert {
+    condition     = output.chunk_count == 1
+    error_message = "The two named metadata reads that match a pattern must stay allowed."
+  }
 }
 
 run "rejects_a_write_action" {
@@ -418,8 +630,8 @@ run "no_state_location_grants_nothing" {
   }
 
   assert {
-    condition     = length(output.state_location_tags) == 0 && try(length(aws_iam_role.this.tags), 0) == 0
-    error_message = "A role without state_locations must not carry a state location tag."
+    condition     = length(output.state_location_tags) == 0 && length(aws_iam_role.this.tags) == 1 && contains(keys(aws_iam_role.this.tags), "neuralsec:integration-version")
+    error_message = "A role without state_locations must carry only the release version tag and no state location tag."
   }
 
   assert {
@@ -555,7 +767,7 @@ run "state_locations_grant_exactly_the_registered_prefixes" {
   }
 
   assert {
-    condition     = length(aws_iam_role.this.tags) == 2 && aws_iam_role.this.tags["neuralsec:state-locations-1"] == output.state_location_tags["neuralsec:state-locations-1"]
+    condition     = length(aws_iam_role.this.tags) == 3 && aws_iam_role.this.tags["neuralsec:state-locations-1"] == output.state_location_tags["neuralsec:state-locations-1"]
     error_message = "The role must carry the state location tags the module exposes."
   }
 }

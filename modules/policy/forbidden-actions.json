@@ -1,0 +1,78 @@
+{
+  "deny_resources": [
+    "arn:aws:apigateway:*::/apikeys",
+    "arn:aws:apigateway:*::/apikeys/*",
+    "arn:aws:apigateway:*::/apis/*/exports/*",
+    "arn:aws:apigateway:*::/restapis/*/stages/*/exports/*",
+    "arn:aws:apigateway:*::/restapis/*/stages/*/sdks/*",
+    "arn:aws:apigateway:*::/usageplans/*/keys",
+    "arn:aws:apigateway:*::/usageplans/*/keys/*"
+  ],
+  "documented_exceptions": {
+    "lambda:GetFunction": "Stays granted: the scanner needs the container image URI of image functions. The code location it also returns is never fetched or stored."
+  },
+  "exact": [
+    "appsync:GetGraphqlApiEnvironmentVariables",
+    "athena:GetQueryResults",
+    "cloudfront:GetFunction",
+    "codecommit:GetBlob",
+    "codecommit:GetFile",
+    "codecommit:GetFolder",
+    "cognito-identity:GetCredentialsForIdentity",
+    "cognito-identity:GetOpenIdToken",
+    "dynamodb:BatchGetItem",
+    "dynamodb:GetItem",
+    "dynamodb:Query",
+    "dynamodb:Scan",
+    "ec2:GetConsoleOutput",
+    "ec2:GetConsoleScreenshot",
+    "ec2:GetPasswordData",
+    "ecr:BatchGetImage",
+    "ecr:GetAuthorizationToken",
+    "ecr:GetDownloadUrlForLayer",
+    "glacier:GetJobOutput",
+    "kinesis:GetRecords",
+    "kms:Decrypt",
+    "lambda:GetLayerVersion",
+    "lightsail:GetInstanceAccessDetails",
+    "lightsail:GetRelationalDatabaseMasterUserPassword",
+    "logs:FilterLogEvents",
+    "logs:GetLogEvents",
+    "logs:GetLogRecord",
+    "logs:GetQueryResults",
+    "redshift-serverless:GetCredentials",
+    "redshift:GetClusterCredentials",
+    "redshift:GetClusterCredentialsWithIAM",
+    "s3:GetObject",
+    "s3:GetObjectVersion",
+    "s3:SelectObjectContent",
+    "secretsmanager:BatchGetSecretValue",
+    "secretsmanager:GetSecretValue",
+    "sqs:ReceiveMessage",
+    "ssm:GetParameter",
+    "ssm:GetParameterHistory",
+    "ssm:GetParameters",
+    "ssm:GetParametersByPath",
+    "sts:GetFederationToken",
+    "sts:GetSessionToken"
+  ],
+  "pattern_exceptions": [
+    "iam:GetAccountPasswordPolicy",
+    "iam:ListServiceSpecificCredentials"
+  ],
+  "patterns": [
+    "Credentials",
+    "Password",
+    "SecretValue",
+    "AuthorizationToken",
+    "SessionToken",
+    "FederationToken",
+    "GetObject$",
+    "GetRecords$",
+    "QueryResults$"
+  ],
+  "pending_removal": {
+    "actions": [],
+    "deadline": "2026-11-24"
+  }
+}

@@ -1,0 +1,32 @@
+{
+  "Accounts": [
+    {
+      "Id": "999999999999",
+      "Arn": "arn:aws:organizations::999999999999:account/o-synthetic01/999999999999",
+      "Email": "management@example.com",
+      "Name": "synthetic-management",
+      "State": "ACTIVE",
+      "JoinedMethod": "INVITED",
+      "JoinedTimestamp": "2026-01-02T03:04:05Z"
+    },
+    {
+      "Id": "111111111111",
+      "Arn": "arn:aws:organizations::999999999999:account/o-synthetic01/111111111111",
+      "Email": "one@example.com",
+      "Name": "synthetic-one",
+      "State": "SUSPENDED",
+      "JoinedMethod": "INVITED",
+      "JoinedTimestamp": "2026-01-02T03:04:05Z",
+      "Status": "ACTIVE"
+    },
+    {
+      "Id": "222222222222",
+      "Arn": "arn:aws:organizations::999999999999:account/o-synthetic01/222222222222",
+      "Email": "two@example.com",
+      "Name": "synthetic-two",
+      "Status": "ACTIVE",
+      "JoinedMethod": "INVITED",
+      "JoinedTimestamp": "2026-01-02T03:04:05Z"
+    }
+  ]
+}

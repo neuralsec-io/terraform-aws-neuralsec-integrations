@@ -1,5 +1,5 @@
 {
-  "version": "5f5dd5ce",
+  "version": "6a1c021f",
   "account": [
     "access-analyzer:GetAnalyzer",
     "access-analyzer:ListAnalyzers",
@@ -17,10 +17,7 @@
     "application-autoscaling:ListTagsForResource",
     "appstream:DescribeFleets",
     "appstream:ListTagsForResource",
-    "appsync:GetGraphqlApi",
-    "appsync:GetGraphqlApiEnvironmentVariables",
     "appsync:ListGraphqlApis",
-    "appsync:ListTagsForResource",
     "athena:GetWorkGroup",
     "athena:ListTagsForResource",
     "athena:ListWorkGroups",
@@ -64,12 +61,10 @@
     "cloudformation:ListResources",
     "cloudformation:ListStackResources",
     "cloudformation:ListStacks",
-    "cloudfront:DescribeFunction",
     "cloudfront:GetCachePolicy",
     "cloudfront:GetCloudFrontOriginAccessIdentity",
     "cloudfront:GetDistribution",
     "cloudfront:GetDistributionConfig",
-    "cloudfront:GetFunction",
     "cloudfront:GetOriginAccessControl",
     "cloudfront:GetOriginRequestPolicy",
     "cloudfront:GetResponseHeadersPolicy",
@@ -381,6 +376,7 @@
     "lambda:ListFunctions",
     "lambda:ListLayerVersions",
     "lambda:ListLayers",
+    "lambda:ListTags",
     "lambda:ListVersionsByFunction",
     "lightsail:GetInstance",
     "lightsail:GetInstances",
@@ -619,5 +615,19 @@
     "kms:Decrypt",
     "s3:GetObject",
     "s3:ListBucket"
+  ],
+  "deny_resources": [
+    {
+      "action": "apigateway:GET",
+      "resources": [
+        "arn:aws:apigateway:*::/apikeys",
+        "arn:aws:apigateway:*::/apikeys/*",
+        "arn:aws:apigateway:*::/apis/*/exports/*",
+        "arn:aws:apigateway:*::/restapis/*/stages/*/exports/*",
+        "arn:aws:apigateway:*::/restapis/*/stages/*/sdks/*",
+        "arn:aws:apigateway:*::/usageplans/*/keys",
+        "arn:aws:apigateway:*::/usageplans/*/keys/*"
+      ]
+    }
   ]
 }

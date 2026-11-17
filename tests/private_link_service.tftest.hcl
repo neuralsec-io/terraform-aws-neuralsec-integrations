@@ -272,6 +272,36 @@ run "instance_targets_use_the_vpc_cidr" {
   }
 }
 
+run "instance_targets_cover_every_vpc_cidr_association" {
+  command = plan
+
+  module {
+    source = "./modules/private-link-service"
+  }
+
+  override_data {
+    target = data.aws_vpc.this[0]
+    values = {
+      cidr_block = "10.0.0.0/16"
+      cidr_block_associations = [
+        { association_id = "vpc-cidr-assoc-0123456789abcdef0", cidr_block = "10.0.0.0/16", state = "associated" },
+        { association_id = "vpc-cidr-assoc-0123456789abcdef1", cidr_block = "100.64.0.0/16", state = "associated" },
+        { association_id = "vpc-cidr-assoc-0123456789abcdef2", cidr_block = "172.16.0.0/16", state = "disassociated" },
+      ]
+    }
+  }
+
+  variables {
+    target_ips          = []
+    target_instance_ids = ["i-0123456789abcdef0"]
+  }
+
+  assert {
+    condition     = toset([for rule in aws_security_group.this[0].egress : rule.cidr_blocks[0]]) == toset(["10.0.0.0/16", "100.64.0.0/16"])
+    error_message = "The egress rule covers every associated VPC CIDR block and no disassociated one."
+  }
+}
+
 run "alb_target_uses_an_alb_target_group" {
   command = plan
 
