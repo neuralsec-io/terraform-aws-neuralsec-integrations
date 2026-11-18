@@ -249,6 +249,198 @@ run "rejects_an_http_target_port_out_of_range" {
   expect_failures = [var.http_target_port]
 }
 
+run "default_ports_are_443_and_80" {
+  command = plan
+
+  module {
+    source = "./modules/private-link-service"
+  }
+
+  variables {
+    http_target_port = 8080
+  }
+
+  assert {
+    condition     = aws_lb_listener.this[0].port == 443 && aws_lb_listener.http[0].port == 80 && aws_lb_target_group.this[0].port == 443
+    error_message = "Without port inputs the listeners are 443 and 80 and the target port is 443, as before."
+  }
+}
+
+run "listener_port_moves_the_listener_target_group_and_health_check" {
+  command = plan
+
+  module {
+    source = "./modules/private-link-service"
+  }
+
+  variables {
+    listener_port = 8443
+  }
+
+  assert {
+    condition     = aws_lb_listener.this[0].port == 8443 && aws_lb_target_group.this[0].port == 8443
+    error_message = "listener_port sets the listener and, by default, the target port."
+  }
+
+  assert {
+    condition     = aws_lb_target_group.this[0].health_check[0].port == "8443"
+    error_message = "The health check follows the target port."
+  }
+
+  assert {
+    condition     = contains([for rule in aws_security_group.this[0].egress : rule.from_port], 8443)
+    error_message = "Egress is scoped to the resolved target port."
+  }
+}
+
+run "target_port_overrides_the_listener_port" {
+  command = plan
+
+  module {
+    source = "./modules/private-link-service"
+  }
+
+  variables {
+    listener_port = 8443
+    target_port   = 9443
+  }
+
+  assert {
+    condition     = aws_lb_listener.this[0].port == 8443 && aws_lb_target_group.this[0].port == 9443
+    error_message = "An explicit target_port wins over listener_port."
+  }
+}
+
+run "http_listener_port_adds_a_second_listener" {
+  command = plan
+
+  module {
+    source = "./modules/private-link-service"
+  }
+
+  variables {
+    http_target_port   = 8081
+    http_listener_port = 8081
+  }
+
+  assert {
+    condition     = aws_lb_listener.http[0].port == 8081 && aws_lb_listener.this[0].port == 443
+    error_message = "http_listener_port sets the plain HTTP listener."
+  }
+}
+
+run "rejects_equal_listener_ports_with_http_on" {
+  command = plan
+
+  module {
+    source = "./modules/private-link-service"
+  }
+
+  variables {
+    listener_port      = 8081
+    http_target_port   = 8081
+    http_listener_port = 8081
+  }
+
+  expect_failures = [aws_vpc_endpoint_service.this]
+}
+
+run "equal_listener_ports_are_fine_with_http_off" {
+  command = plan
+
+  module {
+    source = "./modules/private-link-service"
+  }
+
+  variables {
+    listener_port      = 80
+    http_listener_port = 80
+  }
+
+  assert {
+    condition     = aws_lb_listener.this[0].port == 80 && length(aws_lb_listener.http) == 0
+    error_message = "The HTTP listener port is unused while plain HTTP is off."
+  }
+}
+
+run "rejects_a_listener_port_out_of_range" {
+  command = plan
+
+  module {
+    source = "./modules/private-link-service"
+  }
+
+  variables {
+    listener_port = 0
+  }
+
+  expect_failures = [var.listener_port]
+}
+
+run "rejects_an_http_listener_port_out_of_range" {
+  command = plan
+
+  module {
+    source = "./modules/private-link-service"
+  }
+
+  variables {
+    http_listener_port = 65536
+  }
+
+  expect_failures = [var.http_listener_port]
+}
+
+run "rejects_a_target_port_out_of_range" {
+  command = plan
+
+  module {
+    source = "./modules/private-link-service"
+  }
+
+  variables {
+    target_port = 70000
+  }
+
+  expect_failures = [var.target_port]
+}
+
+run "integration_version_tag_equals_the_release_version" {
+  command = plan
+
+  module {
+    source = "./modules/private-link-service"
+  }
+
+  assert {
+    condition     = aws_lb.this[0].tags["neuralsec:integration-version"] == jsondecode(file("${path.cwd}/modules/policy/version.json")).integration_version
+    error_message = "The integration-version tag must equal the release version in version.json."
+  }
+
+  assert {
+    condition     = length(regexall("Value: ${jsondecode(file("${path.cwd}/modules/policy/version.json")).integration_version}\n", file("${path.cwd}/../cloudformation/templates/private-link-service.yaml"))) == length(regexall("Key: neuralsec:integration-version", file("${path.cwd}/../cloudformation/templates/private-link-service.yaml")))
+    error_message = "Every template resource carries the release version in its integration-version tag."
+  }
+}
+
+run "template_has_the_listener_port_parameters" {
+  command = plan
+
+  module {
+    source = "./modules/private-link-service"
+  }
+
+  assert {
+    condition     = length(regexall("\n  ListenerPort:\n    Type: Number\n    Default: 443", file("${path.cwd}/../cloudformation/templates/private-link-service.yaml"))) == 1 && length(regexall("\n  HttpListenerPort:\n    Type: Number\n    Default: 80", file("${path.cwd}/../cloudformation/templates/private-link-service.yaml"))) == 1 && length(regexall("\n  TargetPort:\n    Type: Number\n    Default: 0", file("${path.cwd}/../cloudformation/templates/private-link-service.yaml"))) == 1
+    error_message = "The template takes ListenerPort 443, HttpListenerPort 80 and TargetPort 0 (same as ListenerPort)."
+  }
+
+  assert {
+    condition     = length(regexall("Port: !Ref ListenerPort\n", file("${path.cwd}/../cloudformation/templates/private-link-service.yaml"))) == 1 && length(regexall("Port: !Ref HttpListenerPort\n", file("${path.cwd}/../cloudformation/templates/private-link-service.yaml"))) == 1
+    error_message = "The two listeners use the listener port parameters."
+  }
+}
+
 run "instance_targets_use_the_vpc_cidr" {
   command = plan
 
@@ -336,7 +528,7 @@ run "alb_target_uses_an_alb_target_group" {
   assert {
     condition = (
       aws_lb_target_group.this[0].health_check[0].protocol == "HTTPS" &&
-      aws_lb_target_group.this[0].health_check[0].port == tostring(var.target_port) &&
+      aws_lb_target_group.this[0].health_check[0].port == "443" &&
       aws_lb_target_group.this[0].health_check[0].path == "/" &&
       aws_lb_target_group.this[0].health_check[0].matcher == "200-499"
     )
@@ -795,8 +987,8 @@ run "template_has_the_optional_http_listener" {
   }
 
   assert {
-    condition     = length(regexall("HttpTargetPort:", file("${path.cwd}/../cloudformation/templates/private-link-service.yaml"))) == 1 && length(regexall("Port: 80\n", file("${path.cwd}/../cloudformation/templates/private-link-service.yaml"))) == 1
-    error_message = "The template exposes HttpTargetPort and one port 80 listener."
+    condition     = length(regexall("HttpTargetPort:", file("${path.cwd}/../cloudformation/templates/private-link-service.yaml"))) == 1 && length(regexall("Port: !Ref HttpListenerPort\n", file("${path.cwd}/../cloudformation/templates/private-link-service.yaml"))) == 1
+    error_message = "The template exposes HttpTargetPort and one plain HTTP listener on HttpListenerPort."
   }
 }
 

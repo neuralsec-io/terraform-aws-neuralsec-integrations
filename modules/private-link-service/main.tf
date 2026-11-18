@@ -28,6 +28,9 @@ locals {
 
   create_nlb = var.existing_nlb_arn == null
 
+  # The target port follows the HTTPS listener port unless it is set.
+  target_port = coalesce(var.target_port, var.listener_port)
+
   # One target kind at a time, in the order of preference: the recommended ALB
   # first, then instance ids, then fixed IPs.
   target_type = (
@@ -56,7 +59,7 @@ locals {
     ] : is_set if is_set
   ])
 
-  # The load balancer accepts connections only on 443 (and 80 when http_target_port is set), so its egress is scoped
+  # The load balancer accepts connections only on listener_port (and http_listener_port when http_target_port is set), so its egress is scoped
   # to the targets on the target port. Instance targets and an ALB can move
   # within the VPC, so their rule covers the VPC CIDR; fixed IPs are named one
   # by one.
@@ -86,7 +89,7 @@ locals {
   # Egress ports of the load balancer security group: the target port, plus the
   # HTTP target port when enabled and different (a duplicate rule is refused).
   egress_ports = toset(concat(
-    [var.target_port],
+    [local.target_port],
     local.http_enabled ? [var.http_target_port] : [],
   ))
 
@@ -160,7 +163,7 @@ resource "aws_lb_target_group" "this" {
   # deleted; with a fixed name AWS would refuse the second group. The Name tag
   # in local.tags keeps the link name.
   name_prefix = "nspl-"
-  port        = var.target_port
+  port        = local.target_port
   protocol    = "TCP"
   target_type = local.target_type
   vpc_id      = var.vpc_id
@@ -178,7 +181,7 @@ resource "aws_lb_target_group" "this" {
 
     content {
       protocol = "HTTPS"
-      port     = var.target_port
+      port     = local.target_port
       path     = "/"
       matcher  = "200-499"
     }
@@ -189,7 +192,7 @@ resource "aws_lb_target_group" "this" {
 
     content {
       protocol = "TCP"
-      port     = var.target_port
+      port     = local.target_port
     }
   }
 
@@ -201,7 +204,7 @@ resource "aws_lb_target_group_attachment" "this" {
 
   target_group_arn = aws_lb_target_group.this[0].arn
   target_id        = local.targets[count.index]
-  port             = var.target_port
+  port             = local.target_port
 }
 
 # Optional plain HTTP, off by default: same target kind and registration as the
@@ -255,7 +258,7 @@ resource "aws_lb_listener" "http" {
   count = local.http_enabled ? 1 : 0
 
   load_balancer_arn = aws_lb.this[0].arn
-  port              = 80
+  port              = var.http_listener_port
   protocol          = "TCP"
 
   default_action {
@@ -270,7 +273,7 @@ resource "aws_lb_listener" "this" {
   count = local.create_nlb ? 1 : 0
 
   load_balancer_arn = aws_lb.this[0].arn
-  port              = 443
+  port              = var.listener_port
   protocol          = "TCP"
 
   default_action {
@@ -299,6 +302,11 @@ resource "aws_vpc_endpoint_service" "this" {
   # alongside existing_nlb_arn are accepted and ignored, because they only feed
   # the load balancer this module creates.
   lifecycle {
+    precondition {
+      condition     = !local.http_enabled || var.listener_port != var.http_listener_port
+      error_message = "listener_port and http_listener_port must differ when http_target_port is set."
+    }
+
     precondition {
       condition = (
         var.existing_nlb_arn != null ? var.target_alb_arn == null : local.target_kinds_set == 1

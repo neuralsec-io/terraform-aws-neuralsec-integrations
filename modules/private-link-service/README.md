@@ -18,19 +18,30 @@ release with `supported_regions` on `aws_vpc_endpoint_service`) and the
 | `aws_security_group` | outbound traffic on the target port to the targets; no inbound rule |
 | `aws_lb_target_group` | TCP target group, `alb` for `target_alb_arn`, `instance` for `target_instance_ids`, `ip` for `target_ips`; a TCP health check on the target port, or an HTTPS one on the ALB listener port for an ALB target |
 | `aws_lb_target_group_attachment` | one entry per target; the single ALB entry carries the load balancer ARN |
-| `aws_lb_listener` | TCP 443, forwarded to the target group; with `http_target_port` also TCP 80, forwarded to a second target group (`http`) on that port with the same targets and a TCP health check (HTTP for an ALB target) |
+| `aws_lb_listener` | TCP `listener_port` (443 by default), forwarded to the target group; with `http_target_port` also TCP `http_listener_port` (80 by default), forwarded to a second target group (`http`) on that port with the same targets and a TCP health check (HTTP for an ALB target) |
 | `aws_vpc_endpoint_service` | endpoint service for the load balancer, `allowed_principals` exactly the Neuralsec role, no private DNS name |
 
 With `existing_nlb_arn` set, it creates only the endpoint service and skips the
 load balancer, target group, listener and security group. In that mode
-`http_target_port` has no effect: add the TCP 80 listener to your load balancer
-yourself.
+`listener_port`, `http_listener_port` and `http_target_port` have no effect: your
+own listeners must match the ports entered in the Neuralsec app for this
+connection, and the plain HTTP listener is yours to add.
 
 ## Plain HTTP
 
-Set `http_target_port` to also accept plain HTTP on port 80. Plain HTTP is
-supported only through this private connection, on port 80. Prefer HTTPS. The
-443 listener is unchanged.
+Set `http_target_port` to also accept plain HTTP on `http_listener_port` (80 by
+default). Plain HTTP is supported only through this private connection. Prefer
+HTTPS. The HTTPS listener is unchanged.
+
+## Custom ports
+
+The load balancer listens on the port your service uses. For a service on
+`https://registry.example:8443`, set `listener_port = 8443` once: the targets
+follow it unless `target_port` differs. Enter the same ports in the Neuralsec
+app for this connection. With plain HTTP on a custom port, set both
+`http_target_port` and `http_listener_port`; the two listener ports must differ.
+With `existing_nlb_arn` the module creates no listener, so your own listeners
+must match the ports entered in the Neuralsec app.
 
 ## Inputs
 
@@ -46,8 +57,10 @@ supported only through this private connection, on port 80. Prefer HTTPS. The
 | `target_alb_arn` | string | `null` | ARN of an internal Application Load Balancer, the recommended target: it keeps a stable ARN while its addresses change. Set exactly one of `target_alb_arn`, `target_ips` and `target_instance_ids`, or `existing_nlb_arn` instead, which rejects an ALB target |
 | `target_ips` | list(string) | `[]` | private IPv4 addresses of the service. Set exactly one of `target_alb_arn`, `target_ips` and `target_instance_ids` unless `existing_nlb_arn` is set, which ignores them |
 | `target_instance_ids` | list(string) | `[]` | instance ids of the service. Set exactly one of the three unless `existing_nlb_arn` is set, which ignores them |
-| `target_port` | number | `443` | TCP port of the targets. The listener on 443 is HTTPS. With `target_alb_arn` it must be the port of an ALB listener, so a health check reaches the ALB |
-| `http_target_port` | number | `null` | optional TCP port of the targets for plain HTTP. When set, the load balancer also listens on TCP 80 and forwards to it. Plain HTTP is supported only through this private connection, on port 80. Prefer HTTPS. Ignored with `existing_nlb_arn` |
+| `listener_port` | number | `443` | TCP port the load balancer listens on for HTTPS and the connection uses; enter the same port in the Neuralsec app. Ignored with `existing_nlb_arn` |
+| `http_listener_port` | number | `80` | TCP port for plain HTTP, used only when `http_target_port` is set; must differ from `listener_port` |
+| `target_port` | number | `null` | TCP port of the targets; null uses `listener_port`. With `target_alb_arn` it must be the port of an ALB listener, so a health check reaches the ALB |
+| `http_target_port` | number | `null` | optional TCP port of the targets for plain HTTP. When set, the load balancer also listens on `http_listener_port` and forwards to it. Plain HTTP is supported only through this private connection. Prefer HTTPS. Ignored with `existing_nlb_arn` |
 | `acceptance_required` | bool | `true` | whether a connection request needs your acceptance, so you can confirm the request's endpoint ID matches the one shown in the Neuralsec app for this connection. Set `false` only if you accept that any Neuralsec connection using this service name is accepted automatically |
 | `existing_nlb_arn` | string | `null` | ARN of an existing internal Network Load Balancer to publish; `target_ips` and `target_instance_ids` are ignored with it and an ALB target is rejected |
 | `tags` | map(string) | `{}` | additional tags for every resource |
@@ -106,7 +119,7 @@ the hostname or path. The target port must be the port of an ALB listener.
 ```hcl
 module "neuralsec_private_link_service" {
   source  = "neuralsec-io/neuralsec-integrations/aws//modules/private-link-service"
-  version = "0.3.19"
+  version = "0.3.20"
 
   name                    = "registry"
   neuralsec_org_id        = "00000000-0000-4000-8000-000000000000"
@@ -125,7 +138,7 @@ change: a fixed IP that moves breaks the link silently.
 ```hcl
 module "neuralsec_private_link_service" {
   source  = "neuralsec-io/neuralsec-integrations/aws//modules/private-link-service"
-  version = "0.3.19"
+  version = "0.3.20"
 
   name                    = "registry"
   neuralsec_org_id        = "00000000-0000-4000-8000-000000000000"

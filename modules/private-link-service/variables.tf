@@ -102,19 +102,41 @@ variable "target_instance_ids" {
   }
 }
 
-variable "target_port" {
-  description = "TCP port of the targets. The listener on 443 is HTTPS. With target_alb_arn it must be the port of an ALB listener, so a health check reaches the ALB; it defaults to 443, the HTTPS listener."
+variable "listener_port" {
+  description = "TCP port the load balancer listens on for HTTPS, and the port the Neuralsec connection uses. Default 443. Enter the same port in the Neuralsec app. TLS stays end to end. With existing_nlb_arn it is ignored: your own listeners must match the ports entered in the Neuralsec app."
   type        = number
   default     = 443
 
   validation {
-    condition     = var.target_port >= 1 && var.target_port <= 65535
-    error_message = "target_port must be a TCP port between 1 and 65535."
+    condition     = var.listener_port >= 1 && var.listener_port <= 65535
+    error_message = "listener_port must be a TCP port between 1 and 65535."
+  }
+}
+
+variable "http_listener_port" {
+  description = "TCP port the load balancer listens on for plain HTTP, used only when http_target_port is set. Default 80. It must differ from listener_port. Enter the same port in the Neuralsec app."
+  type        = number
+  default     = 80
+
+  validation {
+    condition     = var.http_listener_port >= 1 && var.http_listener_port <= 65535
+    error_message = "http_listener_port must be a TCP port between 1 and 65535."
+  }
+}
+
+variable "target_port" {
+  description = "TCP port of the targets. Null, the default, uses listener_port. With target_alb_arn it must be the port of an ALB listener, so a health check reaches the ALB."
+  type        = number
+  default     = null
+
+  validation {
+    condition     = var.target_port == null || (var.target_port >= 1 && var.target_port <= 65535)
+    error_message = "target_port must be a TCP port between 1 and 65535, or null."
   }
 }
 
 variable "http_target_port" {
-  description = "Optional. TCP port of the targets for plain HTTP. When set, the load balancer also listens on TCP 80 and forwards to a second target group on this port, with the same targets as the 443 path. Plain HTTP is supported only through this private connection, on port 80. Prefer HTTPS. Null disables it. With existing_nlb_arn it is ignored: add the port 80 listener to your load balancer yourself."
+  description = "Optional. TCP port of the targets for plain HTTP. When set, the load balancer also listens on http_listener_port (80 by default) and forwards to a second target group on this port, with the same targets as the HTTPS path. Plain HTTP is supported only through this private connection. Prefer HTTPS. Null disables it. With existing_nlb_arn it is ignored: add the plain HTTP listener to your load balancer yourself."
   type        = number
   default     = null
 
