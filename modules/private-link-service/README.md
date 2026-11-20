@@ -119,7 +119,7 @@ the hostname or path. The target port must be the port of an ALB listener.
 ```hcl
 module "neuralsec_private_link_service" {
   source  = "neuralsec-io/neuralsec-integrations/aws//modules/private-link-service"
-  version = "0.3.21"
+  version = "0.3.22"
 
   name                    = "registry"
   neuralsec_org_id        = "00000000-0000-4000-8000-000000000000"
@@ -138,7 +138,7 @@ change: a fixed IP that moves breaks the link silently.
 ```hcl
 module "neuralsec_private_link_service" {
   source  = "neuralsec-io/neuralsec-integrations/aws//modules/private-link-service"
-  version = "0.3.21"
+  version = "0.3.22"
 
   name                    = "registry"
   neuralsec_org_id        = "00000000-0000-4000-8000-000000000000"

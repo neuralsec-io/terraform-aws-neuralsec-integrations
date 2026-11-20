@@ -107,7 +107,7 @@ variable "state_locations" {
   validation {
     condition = alltrue([
       for loc in var.state_locations :
-      loc.region == null || can(regex("^[a-z]{2}(-[a-z]+)+-[0-9]+$", loc.region))
+      loc.region == null ? true : can(regex("^[a-z]{2}(-[a-z]+)+-[0-9]+$", loc.region))
     ])
     error_message = "state_locations region must be an AWS region name or null to use the provider region."
   }

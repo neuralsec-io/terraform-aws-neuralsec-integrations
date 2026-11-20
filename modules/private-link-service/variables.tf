@@ -75,7 +75,7 @@ variable "target_alb_arn" {
   default     = null
 
   validation {
-    condition     = var.target_alb_arn == null || can(regex("^arn:aws[a-z-]*:elasticloadbalancing:[a-z0-9-]+:[0-9]{12}:loadbalancer/app/.+$", var.target_alb_arn))
+    condition     = var.target_alb_arn == null ? true : can(regex("^arn:aws[a-z-]*:elasticloadbalancing:[a-z0-9-]+:[0-9]{12}:loadbalancer/app/.+$", var.target_alb_arn))
     error_message = "target_alb_arn must be the ARN of an Application Load Balancer."
   }
 }
@@ -130,7 +130,7 @@ variable "target_port" {
   default     = null
 
   validation {
-    condition     = var.target_port == null || (var.target_port >= 1 && var.target_port <= 65535)
+    condition     = var.target_port == null ? true : (var.target_port >= 1 && var.target_port <= 65535)
     error_message = "target_port must be a TCP port between 1 and 65535, or null."
   }
 }
@@ -158,7 +158,7 @@ variable "existing_nlb_arn" {
   default     = null
 
   validation {
-    condition     = var.existing_nlb_arn == null || can(regex("^arn:aws[a-z-]*:elasticloadbalancing:[a-z0-9-]+:[0-9]{12}:loadbalancer/net/.+$", var.existing_nlb_arn))
+    condition     = var.existing_nlb_arn == null ? true : can(regex("^arn:aws[a-z-]*:elasticloadbalancing:[a-z0-9-]+:[0-9]{12}:loadbalancer/net/.+$", var.existing_nlb_arn))
     error_message = "existing_nlb_arn must be the ARN of a Network Load Balancer."
   }
 }
