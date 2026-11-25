@@ -1,5 +1,5 @@
 {
-  "version": "6a1c021f",
+  "version": "8ab76dc9",
   "account": [
     "access-analyzer:GetAnalyzer",
     "access-analyzer:ListAnalyzers",
@@ -13,8 +13,6 @@
     "apigateway:GET",
     "application-autoscaling:DescribeScalableTargets",
     "application-autoscaling:DescribeScalingPolicies",
-    "application-autoscaling:DescribeScheduledActions",
-    "application-autoscaling:ListTagsForResource",
     "appstream:DescribeFleets",
     "appstream:ListTagsForResource",
     "appsync:ListGraphqlApis",
@@ -229,6 +227,7 @@
     "ecs:ListClusters",
     "ecs:ListServices",
     "ecs:ListTagsForResource",
+    "ecs:ListTaskDefinitionFamilies",
     "ecs:ListTaskDefinitions",
     "ecs:ListTasks",
     "eks:DescribeAccessEntry",

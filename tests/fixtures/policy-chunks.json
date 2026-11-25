@@ -324,8 +324,6 @@
     "4": [
       "application-autoscaling:DescribeScalableTargets",
       "application-autoscaling:DescribeScalingPolicies",
-      "application-autoscaling:DescribeScheduledActions",
-      "application-autoscaling:ListTagsForResource",
       "appstream:DescribeFleets",
       "appstream:ListTagsForResource",
       "bedrock-agentcore:GetAgentRuntime",
@@ -359,6 +357,7 @@
       "ecs:ListClusters",
       "ecs:ListServices",
       "ecs:ListTagsForResource",
+      "ecs:ListTaskDefinitionFamilies",
       "ecs:ListTaskDefinitions",
       "ecs:ListTasks",
       "elasticfilesystem:DescribeAccessPoints",
