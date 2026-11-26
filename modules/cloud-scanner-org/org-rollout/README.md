@@ -116,21 +116,37 @@ roles twice.
 
 ## Plain Terraform path
 
-Terraform has no provider `for_each`, so `scripts/gen-org-providers.sh` reads the
-organization with `aws organizations list-accounts` and writes
-`providers.generated.tf`: one aliased provider and one `cloud-scanner-role` module
-block per ACTIVE account. The file is not committed (it is in `.gitignore`),
-because it holds your account IDs.
+Terraform has no provider `for_each`, so `gen-org-providers.sh`, which ships in
+this module directory, reads the organization with
+`aws organizations list-accounts` and writes `providers.generated.tf`: one
+aliased provider and one `cloud-scanner-role` module block per ACTIVE account.
+The file is not committed (it is in `.gitignore`), because it holds your account
+IDs.
 
-From the repository root:
+From this directory:
 
 ```
-bash scripts/gen-org-providers.sh
-cd terraform/modules/cloud-scanner-org/org-rollout
+bash gen-org-providers.sh
 terraform init
 terraform plan -var 'external_id=neuralsec-...' \
   -var 'neuralsec_broker_arn=arn:aws:iam::111111111111:role/neuralsec-cloud-scanner-broker'
 ```
+
+The default output is `providers.generated.tf` next to the script, whatever the
+working directory is, so the file lands where the module reads it.
+
+With Terragrunt, write the file next to your `terragrunt.hcl`. Terragrunt copies
+that directory into the module's working directory, so the generated
+`../../cloud-scanner-role` source resolves:
+
+```
+bash .terragrunt-cache/.../org-rollout/gen-org-providers.sh \
+  --out "$PWD/providers.generated.tf"
+```
+
+If you call org-rollout from your own root module instead, the generated module
+blocks must point at `cloud-scanner-role` from your root: replace
+`../../cloud-scanner-role` with the published module source.
 
 Options: `--accounts <file>` for a saved `list-accounts` JSON instead of the CLI,
 `--out <file>`, `--role-name`, `--partition`, `--exclude <id,id>`,

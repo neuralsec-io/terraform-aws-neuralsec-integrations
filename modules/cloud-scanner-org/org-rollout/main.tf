@@ -11,7 +11,7 @@
 #              among them, using provider for_each. member_account_ids is
 #              required there because provider for_each cannot read a data
 #              source. Delete providers.generated.tf before using this path.
-#   Terraform  scripts/gen-org-providers.sh reads aws organizations
+#   Terraform  gen-org-providers.sh, in this directory, reads aws organizations
 #              list-accounts and writes providers.generated.tf with a static
 #              aliased provider and module block per active account.
 #

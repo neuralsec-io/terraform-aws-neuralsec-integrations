@@ -1,7 +1,7 @@
 # org-rollout, plain Terraform path. Suspended and excluded accounts must be
 # dropped by a filter, never by a provider error. The Terraform path takes its
-# account list from scripts/gen-org-providers.sh, so these runs pass
-# member_account_ids the way the OpenTofu path does.
+# account list from gen-org-providers.sh in this module directory, so these
+# runs pass member_account_ids the way the OpenTofu path does.
 #
 # Terraform never reads providers.tofu, so these runs see no cloud-scanner-role module
 # and need no mock for the per-account provider instances. OpenTofu reads

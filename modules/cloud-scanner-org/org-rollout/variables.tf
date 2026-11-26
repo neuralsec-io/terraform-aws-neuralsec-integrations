@@ -30,7 +30,7 @@ variable "member_access_role_name" {
 }
 
 variable "member_account_ids" {
-  description = "Accounts the rollout manages. Required by the OpenTofu path, where provider for_each cannot read a data source. The plain Terraform path gets its list from scripts/gen-org-providers.sh instead."
+  description = "Accounts the rollout manages. Required by the OpenTofu path, where provider for_each cannot read a data source. The plain Terraform path gets its list from gen-org-providers.sh in this module directory instead."
   type        = list(string)
   default     = []
   nullable    = false
