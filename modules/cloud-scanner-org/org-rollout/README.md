@@ -32,7 +32,8 @@ Neuralsec.
 
 Only accounts whose state is `ACTIVE` are given a role. The state is read from the
 account `state`, and from the deprecated `status` when an account reports no state
-(the AWS provider `~> 6.70` this root requires exposes `state`). Accounts reported
+(provider 6.x exposes `state`; provider 5.x reports only `status`, which the
+filter falls back to). Accounts reported
 `SUSPENDED` or `PENDING_CLOSURE` are never given a role and are listed in the
 `skipped_account_ids` output, so a closed account cannot fail an apply. An empty
 `member_account_ids` is a valid no-op: it creates no provider instance and no
@@ -83,7 +84,10 @@ sets it explicitly, and a `ManagementAccountId` key in a saved list wins over bo
 
 This path requires OpenTofu 1.9 or newer, the first release with provider
 `for_each`; `providers.tofu` sets that version constraint, so an older OpenTofu
-stops at `tofu init`. The Terraform path needs Terraform 1.6 or newer.
+stops at `tofu init`. The Terraform path needs Terraform 1.4 or newer and AWS
+provider 5.34 or newer; the OpenTofu path still needs OpenTofu 1.9 or newer.
+One exception: when the management account was managed before, the generated
+file carries a `removed` block for it, which needs Terraform 1.7 or newer.
 
 OpenTofu reads `providers.tofu`, which declares one provider instance per account
 with provider `for_each` and one `cloud-scanner-role` module per ACTIVE account.
